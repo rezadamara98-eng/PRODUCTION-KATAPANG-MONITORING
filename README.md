@@ -1,12 +1,14 @@
-# Panel Produksi — Dashboard Analisa Output Produksi
+# Panel Produksi Katapang — Dashboard 4 Tab
 
-Dashboard read-only yang mengambil data dari Google Sheets dan menampilkan
-ringkasan output produksi (total output, target, reject, efisiensi, reject
-rate), status per lini/mesin, grafik tren, dan log data mentah.
+Dashboard dengan 4 tab:
+1. **Executive Summary** — ringkasan gabungan data produksi (KPI, status per lini, grafik)
+2. **Dashboard Production** — embed laporan Looker Studio
+3. **Achievement Planning** — placeholder, menunggu struktur data planning
+4. **ASIK Solution** — room chat AI (Claude API) yang menjawab berdasarkan data produksi
 
 Stack: **Next.js** (App Router) → deploy di **Vercel**, source code di
-**GitHub**, data di **Google Sheets** (dibaca lewat Google Sheets API,
-tidak ada penulisan/edit dari web app).
+**GitHub**, data produksi di **Google Sheets** (read-only via Google Sheets API),
+laporan visual dari **Looker Studio** (embed iframe), dan chat AI dari **Claude API**.
 
 ---
 
@@ -118,7 +120,20 @@ lib/
 
 ---
 
-## 7. Troubleshooting
+## 7. Environment variable tambahan (update terbaru)
+
+Selain 4 variabel Google Sheets sebelumnya, sekarang ada tambahan:
+
+| Variable | Keterangan |
+|---|---|
+| `GOOGLE_SHEET_TABS` | Nama tab yang digabung untuk data produksi, dipisah koma. Default: `STRONG PONT LINE,PA` |
+| `NEXT_PUBLIC_LOOKER_EMBED_URL` | Link embed Looker Studio (pastikan pakai `/embed/reporting/`, bukan `/reporting/`, dan laporan sudah di-share "Anyone with the link") |
+| `ANTHROPIC_API_KEY` | API key dari console.anthropic.com, untuk fitur chat AI di tab ASIK Solution |
+
+Kalau update dari deploy sebelumnya, tambahkan variabel-variabel ini di
+**Vercel → Project Settings → Environment Variables**, lalu redeploy.
+
+## 8. Troubleshooting
 
 - **Error "Gagal mengambil data dari Google Sheets"**: cek apakah sheet
   sudah di-share ke email service account (`GOOGLE_CLIENT_EMAIL`) dengan
