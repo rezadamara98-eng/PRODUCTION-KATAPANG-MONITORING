@@ -1,51 +1,48 @@
 import { NextResponse } from "next/server";
-import { getProductionData } from "@/lib/sheets";
+import { getPaData, getStrongPointData } from "@/lib/sheets";
 
 export const dynamic = "force-dynamic";
 
-function buildContextSummary(rows) {
-  if (!rows.length) return "Belum ada data produksi yang tersedia.";
-
-  const totals = rows.reduce(
-    (acc, r) => {
-      acc.output += r.output;
-      acc.target += r.target;
-      acc.reject += r.reject;
-      return acc;
-    },
-    { output: 0, target: 0, reject: 0 }
-  );
-
-  const perLini = new Map();
-  for (const r of rows) {
-    if (!perLini.has(r.lini)) perLini.set(r.lini, { output: 0, target: 0, reject: 0 });
-    const e = perLini.get(r.lini);
-    e.output += r.output;
-    e.target += r.target;
-    e.reject += r.reject;
+function buildContextSummary(paRows, strongPointGroups) {
+  let paSummary = "Data PA belum tersedia.";
+  if (paRows.length > 0) {
+    const latest = paRows[paRows.length - 1];
+    const n = paRows.length;
+    const avg = paRows.reduce(
+      (acc, r) => {
+        acc.supply += r.supply;
+        acc.sewing += r.sewing;
+        acc.gudangJadi += r.gudangJadi;
+        acc.factory += r.factory;
+        return acc;
+      },
+      { supply: 0, sewing: 0, gudangJadi: 0, factory: 0 }
+    );
+    paSummary = `Data PA (Performance Achievement) per departemen, terbaru tanggal ${latest.tanggal}:
+- PA Supply: ${latest.supply.toFixed(2)}% (rata-rata ${(avg.supply / n).toFixed(2)}%)
+- PA Sewing: ${latest.sewing.toFixed(2)}% (rata-rata ${(avg.sewing / n).toFixed(2)}%)
+- PA Gudang Jadi: ${latest.gudangJadi.toFixed(2)}% (rata-rata ${(avg.gudangJadi / n).toFixed(2)}%)
+- PA Factory: ${latest.factory.toFixed(2)}% (rata-rata ${(avg.factory / n).toFixed(2)}%)
+Total ${n} baris data historis tersedia.`;
   }
 
-  const liniSummary = Array.from(perLini.entries())
-    .map(([lini, v]) => {
-      const eff = v.target > 0 ? ((v.output / v.target) * 100).toFixed(1) : "0";
-      return `- ${lini}: output ${v.output}, target ${v.target}, reject ${v.reject}, efisiensi ${eff}%`;
-    })
-    .join("\n");
+  let strongPointSummary = "Data Strong Point Line belum tersedia.";
+  if (strongPointGroups.length > 0) {
+    const lines = strongPointGroups
+      .map((g) => {
+        const lineList = g.lines
+          .map(
+            (l) =>
+              `${l.line} (target kanan ${l.targetKanan}, target kiri ${l.targetKiri}, efisiensi kanan ${l.effKanan.toFixed(1)}%, efisiensi kiri ${l.effKiri.toFixed(1)}%)`
+          )
+          .join("; ");
+        return `- Style "${g.style}" (buyer: ${g.buyer || "-"}): dikerjakan oleh line ${lineList}`;
+      })
+      .join("\n");
+    strongPointSummary = `Data Strong Point Line (kapasitas line per style):\n${lines}`;
+  }
 
-  const efisiensi = totals.target > 0 ? ((totals.output / totals.target) * 100).toFixed(1) : "0";
-  const rejectRate = totals.output > 0 ? ((totals.reject / totals.output) * 100).toFixed(1) : "0";
-
-  return `Ringkasan data produksi (gabungan semua lini):
-Total output: ${totals.output}
-Total target: ${totals.target}
-Total reject: ${totals.reject}
-Efisiensi keseluruhan: ${efisiensi}%
-Reject rate keseluruhan: ${rejectRate}%
-
-Ringkasan per lini/mesin:
-${liniSummary}
-
-Catatan: data absensi, jam kerja, dan planning belum terhubung ke sistem ini.`;
+  return `${paSummary}\n\n${strongPointSummary}\n\nCatatan: data absensi, jam kerja, WIP, dan planning distribusi belum terhubung ke sistem ini.`;
 }
 
 export async function POST(req) {
@@ -63,13 +60,16 @@ export async function POST(req) {
       return NextResponse.json({ error: "Pesan tidak valid." }, { status: 400 });
     }
 
-    const productionRows = await getProductionData().catch(() => []);
-    const contextSummary = buildContextSummary(productionRows);
+    const [paRows, strongPointGroups] = await Promise.all([
+      getPaData().catch(() => []),
+      getStrongPointData().catch(() => []),
+    ]);
+    const contextSummary = buildContextSummary(paRows, strongPointGroups);
 
     const systemPrompt = `Kamu adalah ASIK, asisten AI analisa produksi untuk pabrik Katapang.
 Jawab pertanyaan berdasarkan data berikut. Jika data yang ditanyakan belum tersedia
-(misalnya absensi, jam kerja, atau planning detail), katakan terus terang bahwa data
-itu belum terhubung, jangan mengarang angka.
+(misalnya absensi, jam kerja, WIP, atau detail planning distribusi), katakan terus terang
+bahwa data itu belum terhubung, jangan mengarang angka.
 
 ${contextSummary}`;
 
@@ -91,10 +91,7 @@ ${contextSummary}`;
     if (!response.ok) {
       const errBody = await response.text();
       console.error("Anthropic API error:", errBody);
-      return NextResponse.json(
-        { error: "Gagal menghubungi Claude API." },
-        { status: 502 }
-      );
+      return NextResponse.json({ error: "Gagal menghubungi Claude API." }, { status: 502 });
     }
 
     const data = await response.json();

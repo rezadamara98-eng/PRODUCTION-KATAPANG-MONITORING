@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   ResponsiveContainer,
-  BarChart,
-  Bar,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -13,24 +13,6 @@ import {
 } from "recharts";
 import KpiCard from "./KpiCard";
 import Panel from "./Panel";
-
-function StatusDot({ status }) {
-  const color =
-    status === "hijau" ? "var(--green)" : status === "kuning" ? "var(--amber)" : "var(--red)";
-  return (
-    <span
-      style={{
-        display: "inline-block",
-        width: 10,
-        height: 10,
-        borderRadius: "50%",
-        background: color,
-        boxShadow: `0 0 8px ${color}`,
-        flexShrink: 0,
-      }}
-    />
-  );
-}
 
 export default function ExecutiveSummary() {
   const [rows, setRows] = useState([]);
@@ -43,7 +25,7 @@ export default function ExecutiveSummary() {
     async function load() {
       try {
         setLoading(true);
-        const res = await fetch("/api/production", { cache: "no-store" });
+        const res = await fetch("/api/pa", { cache: "no-store" });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || "Gagal mengambil data");
         if (!cancelled) {
@@ -63,43 +45,36 @@ export default function ExecutiveSummary() {
     };
   }, []);
 
-  const totals = useMemo(() => {
-    return rows.reduce(
+  const latest = rows.length > 0 ? rows[rows.length - 1] : null;
+
+  const averages = useMemo(() => {
+    if (rows.length === 0) return { supply: 0, sewing: 0, gudangJadi: 0, factory: 0 };
+    const sum = rows.reduce(
       (acc, r) => {
-        acc.output += r.output;
-        acc.target += r.target;
-        acc.reject += r.reject;
+        acc.supply += r.supply;
+        acc.sewing += r.sewing;
+        acc.gudangJadi += r.gudangJadi;
+        acc.factory += r.factory;
         return acc;
       },
-      { output: 0, target: 0, reject: 0 }
+      { supply: 0, sewing: 0, gudangJadi: 0, factory: 0 }
     );
+    const n = rows.length;
+    return {
+      supply: sum.supply / n,
+      sewing: sum.sewing / n,
+      gudangJadi: sum.gudangJadi / n,
+      factory: sum.factory / n,
+    };
   }, [rows]);
 
-  const efisiensi = totals.target > 0 ? (totals.output / totals.target) * 100 : 0;
-  const rejectRate = totals.output > 0 ? (totals.reject / totals.output) * 100 : 0;
-
-  const perLini = useMemo(() => {
-    const map = new Map();
-    for (const r of rows) {
-      if (!map.has(r.lini)) map.set(r.lini, { lini: r.lini, output: 0, target: 0, reject: 0 });
-      const entry = map.get(r.lini);
-      entry.output += r.output;
-      entry.target += r.target;
-      entry.reject += r.reject;
-    }
-    return Array.from(map.values())
-      .map((e) => {
-        const eff = e.target > 0 ? (e.output / e.target) * 100 : 0;
-        const status = eff >= 100 ? "hijau" : eff >= 85 ? "kuning" : "merah";
-        return { ...e, eff, status };
-      })
-      .sort((a, b) => b.output - a.output);
-  }, [rows]);
+  // Ambil 30 data terakhir saja untuk grafik tren biar tidak terlalu padat
+  const chartData = useMemo(() => rows.slice(-30), [rows]);
 
   if (loading) {
     return (
       <div style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
-        Mengambil data dari Google Sheets...
+        Mengambil data PA dari Google Sheets...
       </div>
     );
   }
@@ -131,53 +106,68 @@ export default function ExecutiveSummary() {
         }}
       >
         {fetchedAt ? `Diperbarui: ${new Date(fetchedAt).toLocaleString("id-ID")}` : ""}
+        {latest && ` \u00b7 Data terakhir: ${latest.tanggal}`}
       </div>
 
+      <div
+        style={{
+          fontFamily: "var(--font-display)",
+          fontSize: 12,
+          letterSpacing: "0.1em",
+          color: "var(--text-faint)",
+          textTransform: "uppercase",
+          marginBottom: 10,
+        }}
+      >
+        PA Hari Terakhir
+      </div>
       <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 24 }}>
-        <KpiCard eyebrow="Total Output" value={totals.output.toLocaleString("id-ID")} unit="unit" />
-        <KpiCard eyebrow="Total Target" value={totals.target.toLocaleString("id-ID")} unit="unit" />
         <KpiCard
-          eyebrow="Total Reject"
-          value={totals.reject.toLocaleString("id-ID")}
-          unit="unit"
-          tone="red"
+          eyebrow="PA Supply"
+          value={latest ? latest.supply.toFixed(2) : "-"}
+          unit="%"
         />
         <KpiCard
-          eyebrow="Efisiensi"
-          value={efisiensi.toFixed(1)}
+          eyebrow="PA Sewing"
+          value={latest ? latest.sewing.toFixed(2) : "-"}
           unit="%"
-          tone={efisiensi >= 100 ? "green" : efisiensi >= 85 ? undefined : "red"}
         />
         <KpiCard
-          eyebrow="Reject Rate"
-          value={rejectRate.toFixed(1)}
+          eyebrow="PA Gudang Jadi"
+          value={latest ? latest.gudangJadi.toFixed(2) : "-"}
           unit="%"
-          tone={rejectRate <= 2 ? "green" : rejectRate <= 5 ? undefined : "red"}
+        />
+        <KpiCard
+          eyebrow="PA Factory"
+          value={latest ? latest.factory.toFixed(2) : "-"}
+          unit="%"
         />
       </div>
 
-      <Panel title="Status Per Lini / Mesin" style={{ marginBottom: 24 }}>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 20 }}>
-          {perLini.map((l) => (
-            <div key={l.lini} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <StatusDot status={l.status} />
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: 13 }}>{l.lini}</span>
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: 13, color: "var(--text-faint)" }}>
-                {l.eff.toFixed(0)}%
-              </span>
-            </div>
-          ))}
-          {perLini.length === 0 && (
-            <span style={{ color: "var(--text-faint)", fontSize: 13 }}>Belum ada data.</span>
-          )}
-        </div>
-      </Panel>
+      <div
+        style={{
+          fontFamily: "var(--font-display)",
+          fontSize: 12,
+          letterSpacing: "0.1em",
+          color: "var(--text-faint)",
+          textTransform: "uppercase",
+          marginBottom: 10,
+        }}
+      >
+        Rata-rata Keseluruhan
+      </div>
+      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 24 }}>
+        <KpiCard eyebrow="Rata-rata Supply" value={averages.supply.toFixed(2)} unit="%" />
+        <KpiCard eyebrow="Rata-rata Sewing" value={averages.sewing.toFixed(2)} unit="%" />
+        <KpiCard eyebrow="Rata-rata Gudang Jadi" value={averages.gudangJadi.toFixed(2)} unit="%" />
+        <KpiCard eyebrow="Rata-rata Factory" value={averages.factory.toFixed(2)} unit="%" />
+      </div>
 
-      <Panel title="Output vs Target per Lini">
-        <ResponsiveContainer width="100%" height={260}>
-          <BarChart data={perLini}>
+      <Panel title="Tren PA per Departemen (30 hari terakhir)">
+        <ResponsiveContainer width="100%" height={280}>
+          <LineChart data={chartData}>
             <CartesianGrid stroke="var(--steel)" strokeDasharray="2 4" vertical={false} />
-            <XAxis dataKey="lini" stroke="var(--text-faint)" fontSize={12} />
+            <XAxis dataKey="tanggal" stroke="var(--text-faint)" fontSize={11} />
             <YAxis stroke="var(--text-faint)" fontSize={12} />
             <Tooltip
               contentStyle={{
@@ -188,9 +178,11 @@ export default function ExecutiveSummary() {
               }}
             />
             <Legend wrapperStyle={{ fontSize: 12, color: "var(--text-muted)" }} />
-            <Bar dataKey="target" fill="var(--steel-light)" name="Target" />
-            <Bar dataKey="output" fill="var(--amber)" name="Output" />
-          </BarChart>
+            <Line type="monotone" dataKey="supply" stroke="var(--amber)" strokeWidth={2} dot={false} name="Supply" />
+            <Line type="monotone" dataKey="sewing" stroke="var(--green)" strokeWidth={2} dot={false} name="Sewing" />
+            <Line type="monotone" dataKey="gudangJadi" stroke="#4a90d9" strokeWidth={2} dot={false} name="Gudang Jadi" />
+            <Line type="monotone" dataKey="factory" stroke="var(--red)" strokeWidth={2} dot={false} name="Factory" />
+          </LineChart>
         </ResponsiveContainer>
       </Panel>
     </div>
