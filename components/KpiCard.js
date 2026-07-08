@@ -2,7 +2,7 @@
 
 export default function KpiCard({ eyebrow, value, unit, tone }) {
   const toneColor =
-    tone === "green" ? "var(--green)" : tone === "red" ? "var(--red)" : "var(--amber)";
+    tone === "green" ? "var(--green)" : tone === "red" ? "var(--red)" : "var(--teal)";
   return (
     <div
       style={{

@@ -1,145 +1,109 @@
-# Panel Produksi Katapang — Dashboard 4 Tab
+# ASIK_AI - Monitoring Produksi Katapang
 
-Dashboard dengan 4 tab:
-1. **Executive Summary** — ringkasan gabungan data produksi (KPI, status per lini, grafik)
+Dashboard 5 tab untuk monitoring produksi:
+
+1. **Executive Summary** — PA per departemen (kemarin), total WIP (Distribusi/Cutting
+   Synthetic/Cutting Leather, kemarin), grafik WIP Line Sewing per line (kemarin, warna
+   hijau/merah sesuai status Aman/Problem)
 2. **Dashboard Production** — embed laporan Looker Studio
-3. **Achievement Planning** — placeholder, menunggu struktur data planning
-4. **ASIK Solution** — room chat AI (Claude API) yang menjawab berdasarkan data produksi
+3. **Achievement Planning** — Achievement Sewing & Distribusi (kemarin), Monitoring
+   Shipment (akumulasi kekurangan produksi/envelope, qty shipment), plus panel Analisa
+   dan Rekomendasi AI otomatis (menyebutkan SPO/style penyebab kekurangan)
+4. **Manpower dan Kapasitas** — placeholder, menunggu struktur data Jam Kerja, Absensi,
+   Kode Operator Cutting, Kapasitas Cutting
+5. **ASIK Solution** — room chat AI (Claude API), menjawab berdasarkan semua data yang
+   sudah terhubung
 
-Stack: **Next.js** (App Router) → deploy di **Vercel**, source code di
-**GitHub**, data produksi di **Google Sheets** (read-only via Google Sheets API),
-laporan visual dari **Looker Studio** (embed iframe), dan chat AI dari **Claude API**.
-
----
-
-## 1. Format Google Sheet
-
-Buat/gunakan sheet dengan baris pertama sebagai header, kolom A–E:
-
-| Tanggal    | Lini/Mesin | Output | Target | Reject |
-|------------|------------|--------|--------|--------|
-| 2026-07-01 | Lini 1     | 950    | 1000   | 12     |
-| 2026-07-01 | Lini 2     | 880    | 900    | 5      |
-
-Catatan:
-- Format tanggal sebaiknya `YYYY-MM-DD` agar mudah dikelompokkan
-  (harian/bulanan). Format lain kemungkinan masih terbaca, tapi lebih aman
-  konsisten.
-- Nama sheet default yang dibaca adalah `Sheet1`. Jika nama tab sheet-mu
-  beda, sesuaikan `GOOGLE_SHEET_RANGE` nanti di environment variable.
+Tema: gelap dengan aksen teal. Stack: Next.js (App Router) → Vercel, source code di
+GitHub, data di Google Sheets (read-only via Google Sheets API), laporan visual dari
+Looker Studio (embed iframe), AI dari Claude API.
 
 ---
 
-## 2. Setup Google Cloud (Service Account)
+## 1. Setup Google Cloud (Service Account)
 
-Ini yang menghubungkan aplikasi ke Sheets kamu tanpa perlu OAuth login user.
+1. Buka [Google Cloud Console](https://console.cloud.google.com/), buat/pilih project.
+2. **APIs & Services → Library** → cari **Google Sheets API** → **Enable**.
+3. **APIs & Services → Credentials → Create Credentials → Service Account** → beri nama
+   bebas → skip bagian akses/role → **Done**.
+4. Klik service account yang baru dibuat → tab **Keys** → **Add Key → Create new key →
+   JSON** → file otomatis terdownload.
+5. Dari file JSON itu, catat `client_email` dan `private_key`.
+6. **Share Google Sheet** kamu ke email `client_email` tadi, akses **Viewer**.
 
-1. Buka [Google Cloud Console](https://console.cloud.google.com/).
-2. Buat project baru (atau pakai yang sudah ada).
-3. Di menu **APIs & Services → Library**, cari **Google Sheets API**, klik
-   **Enable**.
-4. Di menu **APIs & Services → Credentials**, klik **Create Credentials →
-   Service Account**.
-   - Isi nama bebas, misal `sheets-reader`.
-   - Role tidak perlu diisi (skip saja) — akses diatur lewat share sheet,
-     bukan lewat IAM role.
-5. Setelah service account dibuat, klik service account tersebut → tab
-   **Keys** → **Add Key → Create new key → JSON**. File JSON akan
-   otomatis terdownload — **simpan baik-baik, ini rahasia**.
-6. Dari file JSON tersebut, kamu butuh dua nilai:
-   - `client_email` → contoh: `sheets-reader@nama-project.iam.gserviceaccount.com`
-   - `private_key` → teks panjang yang diawali `-----BEGIN PRIVATE KEY-----`
-7. **Share Google Sheet kamu** ke email `client_email` tadi, cukup akses
-   **Viewer** (karena aplikasi hanya baca data, tidak menulis).
-8. Ambil **Sheet ID** dari URL sheet kamu:
-   `https://docs.google.com/spreadsheets/d/SHEET_ID_DISINI/edit`
+## 2. Environment variable
 
----
+Isi semua ini di `.env.local` (lokal) atau **Vercel → Project Settings → Environment
+Variables** (production). Lihat `.env.example` untuk daftar lengkap dan nilai default.
 
-## 3. Jalankan lokal (opsional, untuk testing dulu)
+| Variable | Keterangan |
+|---|---|
+| `GOOGLE_CLIENT_EMAIL` | Dari file JSON service account |
+| `GOOGLE_PRIVATE_KEY` | Dari file JSON service account (biarkan `\n` apa adanya) |
+| `GOOGLE_SHEET_ID` | ID spreadsheet dari URL |
+| `GOOGLE_SHEET_TAB_PA` dst | Nama tab persis di Google Sheets (default sudah sesuai) |
+| `NEXT_PUBLIC_LOOKER_EMBED_URL` | Link embed Looker Studio (`/embed/reporting/`, bukan `/reporting/`) |
+| `ANTHROPIC_API_KEY` | Dari console.anthropic.com, untuk ASIK Solution dan Analisa AI |
+
+## 3. Jalankan lokal (opsional)
 
 ```bash
 npm install
 cp .env.example .env.local
-# isi .env.local dengan GOOGLE_CLIENT_EMAIL, GOOGLE_PRIVATE_KEY, GOOGLE_SHEET_ID
+# isi .env.local
 npm run dev
 ```
-
-Buka `http://localhost:3000`.
-
----
 
 ## 4. Push ke GitHub
 
 ```bash
-git init
 git add .
-git commit -m "Initial commit: dashboard produksi"
-git branch -M main
-git remote add origin https://github.com/USERNAME/NAMA-REPO.git
-git push -u origin main
+git commit -m "Pesan commit"
+git push
 ```
-
-`.env.local` **tidak akan ikut ter-push** (sudah masuk `.gitignore`), jadi
-kredensial aman.
-
----
 
 ## 5. Deploy ke Vercel
 
-1. Buka [vercel.com](https://vercel.com) → **Add New → Project** →
-   import repo GitHub yang barusan dibuat.
-2. Sebelum klik Deploy, buka bagian **Environment Variables**, isi 4
-   variabel berikut (ambil dari file JSON service account & sheet kamu):
-   - `GOOGLE_CLIENT_EMAIL`
-   - `GOOGLE_PRIVATE_KEY` — **penting**: paste apa adanya termasuk
-     `-----BEGIN PRIVATE KEY-----...-----END PRIVATE KEY-----`, dan biarkan
-     karakter `\n` di dalamnya (jangan diganti jadi enter sungguhan).
-   - `GOOGLE_SHEET_ID`
-   - `GOOGLE_SHEET_RANGE` (contoh: `Sheet1!A:E`)
-3. Klik **Deploy**. Setelah selesai, dashboard bisa diakses lewat URL
-   `nama-project.vercel.app`.
-
-Setiap kali kamu update data di Google Sheets, dashboard akan menampilkan
-data terbaru saat halaman di-refresh (tidak ada cache statis pada data).
-
----
+Import repo di [vercel.com](https://vercel.com), isi environment variable di atas
+sebelum/sesudah deploy pertama, lalu **Deploy**. Kalau environment variable ditambah
+setelah deploy jalan, lakukan **Redeploy** manual.
 
 ## 6. Struktur project
 
 ```
 app/
-  layout.js              # root layout + font
-  globals.css            # tema warna & tipografi
-  page.js                # halaman dashboard (fetch + render)
-  api/production/route.js  # API route yang baca Google Sheets
+  layout.js                       # root layout + font + metadata
+  globals.css                     # tema warna (teal) dan tipografi
+  page.js                         # shell 5 tab + header logo ASIK_AI
+  api/pa/route.js                 # data PA
+  api/wip/route.js                # data WIP (summary 3 tab + line sewing)
+  api/achievement/route.js        # data Achievement Planning
+  api/achievement-analysis/route.js  # analisa AI otomatis untuk Achievement Planning
+  api/chat/route.js               # chat AI untuk ASIK Solution
 lib/
-  sheets.js              # logic koneksi ke Google Sheets API
-.env.example             # template environment variable
+  sheets.js                       # semua fungsi baca Google Sheets
+  dateUtils.js                    # parsing tanggal fleksibel + logika "data kemarin"
+components/
+  ExecutiveSummary.js
+  AchievementPlanning.js
+  DashboardProduction.js
+  ManpowerKapasitas.js             # placeholder
+  AsikSolution.js
+  Logo.js
+  KpiCard.js
+  Panel.js
 ```
 
----
+## 7. Troubleshooting
 
-## 7. Environment variable tambahan (update terbaru)
-
-Selain 4 variabel Google Sheets sebelumnya, sekarang ada tambahan:
-
-| Variable | Keterangan |
-|---|---|
-| `GOOGLE_SHEET_TABS` | Nama tab yang digabung untuk data produksi, dipisah koma. Default: `STRONG PONT LINE,PA` |
-| `NEXT_PUBLIC_LOOKER_EMBED_URL` | Link embed Looker Studio (pastikan pakai `/embed/reporting/`, bukan `/reporting/`, dan laporan sudah di-share "Anyone with the link") |
-| `ANTHROPIC_API_KEY` | API key dari console.anthropic.com, untuk fitur chat AI di tab ASIK Solution |
-
-Kalau update dari deploy sebelumnya, tambahkan variabel-variabel ini di
-**Vercel → Project Settings → Environment Variables**, lalu redeploy.
-
-## 8. Troubleshooting
-
-- **Error "Gagal mengambil data dari Google Sheets"**: cek apakah sheet
-  sudah di-share ke email service account (`GOOGLE_CLIENT_EMAIL`) dengan
-  akses minimal Viewer.
-- **Data kosong/tidak muncul**: cek `GOOGLE_SHEET_RANGE` — nama tab sheet
-  harus persis sama (case-sensitive) dengan yang ada di `Sheet1!A:E`.
-- **Error terkait private key**: biasanya karena `\n` di `GOOGLE_PRIVATE_KEY`
-  ter-strip saat paste. Pastikan value di environment variable Vercel
-  masih ada `\n` literalnya, bukan baris baru sungguhan.
+- **Gagal mengambil data**: cek sheet sudah di-share ke `GOOGLE_CLIENT_EMAIL` (akses
+  Viewer), dan nama tab di environment variable persis sama (case-sensitive) dengan
+  nama tab asli.
+- **Angka WIP/achievement 0 semua**: kemungkinan logika "data kemarin" tidak menemukan
+  baris yang cocok — cek format tanggal di sheet konsisten dengan yang sudah diuji
+  (`14 Juli 2026`, `14/07/2026`, atau `02-Jan`).
+- **gudang jadi salah baca kolom**: tab ini punya 2 baris judul sebelum header asli;
+  kalau strukturnya berubah, sesuaikan `rows.slice(3)` di `getGudangJadiData()`
+  dalam `lib/sheets.js`.
+- **Error terkait private key**: pastikan `\n` di `GOOGLE_PRIVATE_KEY` tetap literal
+  (bukan baris baru sungguhan) saat paste ke Vercel.

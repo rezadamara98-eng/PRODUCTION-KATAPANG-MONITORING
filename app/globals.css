@@ -1,16 +1,16 @@
 :root {
-  --bg: #1b1e20;
-  --panel: #24282b;
-  --panel-raised: #2b3033;
-  --steel: #3d454a;
-  --steel-light: #4a5257;
-  --amber: #f2a900;
-  --amber-dim: #8a6100;
+  --bg: #12181c;
+  --panel: #1c2429;
+  --panel-raised: #212b31;
+  --steel: #33414a;
+  --steel-light: #435560;
+  --teal: #3ab7c4;
+  --teal-dim: #1f6b73;
   --green: #4c9a4c;
-  --red: #c1440e;
-  --text: #e8e6e1;
-  --text-muted: #9ba3a8;
-  --text-faint: #6b7378;
+  --red: #d9534f;
+  --text: #e6edf0;
+  --text-muted: #8a9aa0;
+  --text-faint: #5f6e75;
 
   --font-display: "IBM Plex Sans Condensed", sans-serif;
   --font-body: "IBM Plex Sans", sans-serif;
@@ -42,11 +42,11 @@ button {
 }
 
 ::selection {
-  background: var(--amber);
-  color: #1b1e20;
+  background: var(--teal);
+  color: #12181c;
 }
 
 :focus-visible {
-  outline: 2px solid var(--amber);
+  outline: 2px solid var(--teal);
   outline-offset: 2px;
 }

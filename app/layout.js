@@ -1,8 +1,8 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "Panel Produksi",
-  description: "Dashboard analisa output produksi dari Google Sheets",
+  title: "ASIK_AI - Monitoring Produksi Katapang",
+  description: "Dashboard analisa produksi ASIK_AI untuk pabrik Katapang",
 };
 
 export default function RootLayout({ children }) {

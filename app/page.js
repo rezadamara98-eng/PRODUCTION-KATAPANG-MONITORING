@@ -4,12 +4,15 @@ import { useState } from "react";
 import ExecutiveSummary from "@/components/ExecutiveSummary";
 import DashboardProduction from "@/components/DashboardProduction";
 import AchievementPlanning from "@/components/AchievementPlanning";
+import ManpowerKapasitas from "@/components/ManpowerKapasitas";
 import AsikSolution from "@/components/AsikSolution";
+import Logo from "@/components/Logo";
 
 const TABS = [
   { key: "exec", label: "Executive Summary" },
   { key: "prod", label: "Dashboard Production" },
   { key: "plan", label: "Achievement Planning" },
+  { key: "mp", label: "Manpower dan Kapasitas" },
   { key: "asik", label: "ASIK Solution" },
 ];
 
@@ -20,34 +23,32 @@ export default function Home() {
     <main style={{ minHeight: "100vh", padding: "28px 32px 60px" }}>
       <div
         style={{
-          marginBottom: 24,
+          display: "flex",
+          alignItems: "center",
+          gap: 16,
+          marginBottom: 20,
           paddingBottom: 16,
           borderBottom: "1px solid var(--steel)",
         }}
       >
-        <div
-          style={{
-            fontFamily: "var(--font-mono)",
-            fontSize: 11,
-            letterSpacing: "0.2em",
-            color: "var(--amber)",
-            textTransform: "uppercase",
-            marginBottom: 6,
-          }}
-        >
-          Status Lini &middot; Real-time
+        <Logo size={48} />
+        <div>
+          <h1
+            style={{
+              fontFamily: "var(--font-display)",
+              fontSize: 28,
+              fontWeight: 700,
+              margin: 0,
+              letterSpacing: "0.02em",
+              lineHeight: 1.1,
+            }}
+          >
+            ASIK_AI
+          </h1>
+          <p style={{ fontFamily: "var(--font-mono)", fontSize: 13, color: "var(--text-muted)", margin: "3px 0 0" }}>
+            Monitoring Produksi Katapang
+          </p>
         </div>
-        <h1
-          style={{
-            fontFamily: "var(--font-display)",
-            fontSize: 34,
-            fontWeight: 700,
-            margin: 0,
-            letterSpacing: "0.01em",
-          }}
-        >
-          PANEL PRODUKSI KATAPANG
-        </h1>
       </div>
 
       <div
@@ -67,7 +68,7 @@ export default function Home() {
               padding: "10px 18px",
               background: "none",
               border: "none",
-              borderBottom: active === tab.key ? "2px solid var(--amber)" : "2px solid transparent",
+              borderBottom: active === tab.key ? "2px solid var(--teal)" : "2px solid transparent",
               color: active === tab.key ? "var(--text)" : "var(--text-muted)",
               fontWeight: active === tab.key ? 600 : 400,
               fontSize: 14,
@@ -84,6 +85,7 @@ export default function Home() {
       {active === "exec" && <ExecutiveSummary />}
       {active === "prod" && <DashboardProduction />}
       {active === "plan" && <AchievementPlanning />}
+      {active === "mp" && <ManpowerKapasitas />}
       {active === "asik" && <AsikSolution />}
     </main>
   );

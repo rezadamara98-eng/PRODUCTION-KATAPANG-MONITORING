@@ -1,23 +1,28 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import KpiCard from "./KpiCard";
 import Panel from "./Panel";
 
 export default function AchievementPlanning() {
-  const [groups, setGroups] = useState([]);
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  const [analysis, setAnalysis] = useState(null);
+  const [analysisLoading, setAnalysisLoading] = useState(true);
+  const [analysisError, setAnalysisError] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       try {
         setLoading(true);
-        const res = await fetch("/api/strong-point", { cache: "no-store" });
+        const res = await fetch("/api/achievement", { cache: "no-store" });
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || "Gagal mengambil data");
         if (!cancelled) {
-          setGroups(json.data);
+          setData(json);
           setError(null);
         }
       } catch (err) {
@@ -32,20 +37,46 @@ export default function AchievementPlanning() {
     };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    async function loadAnalysis() {
+      try {
+        setAnalysisLoading(true);
+        const res = await fetch("/api/achievement-analysis", { cache: "no-store" });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || "Gagal mendapat analisa");
+        if (!cancelled) {
+          setAnalysis(json.analysis);
+          setAnalysisError(null);
+        }
+      } catch (err) {
+        if (!cancelled) setAnalysisError(err.message);
+      } finally {
+        if (!cancelled) setAnalysisLoading(false);
+      }
+    }
+    loadAnalysis();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   if (loading) {
     return (
       <div style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
-        Mengambil data Strong Point Line dari Google Sheets...
+        Mengambil data Achievement Planning dari Google Sheets...
       </div>
     );
   }
+
+  const shipment = data?.shipment || {};
 
   return (
     <div>
       {error && (
         <div
           style={{
-            background: "rgba(193,68,14,0.12)",
+            background: "rgba(217,83,79,0.12)",
             border: "1px solid var(--red)",
             color: "var(--text)",
             borderRadius: 4,
@@ -58,75 +89,85 @@ export default function AchievementPlanning() {
         </div>
       )}
 
-      <div
+      <p
         style={{
-          fontFamily: "var(--font-mono)",
+          fontFamily: "var(--font-display)",
           fontSize: 12,
+          letterSpacing: "0.1em",
           color: "var(--text-faint)",
-          marginBottom: 16,
+          textTransform: "uppercase",
+          marginBottom: 10,
         }}
       >
-        {groups.length} style ditemukan &middot; menampilkan line yang bisa mengerjakan tiap style
+        Achievement (data kemarin)
+      </p>
+      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 24 }}>
+        <KpiCard
+          eyebrow="Achievement Sewing"
+          value={data ? data.achievementSewing.toFixed(1) : "-"}
+          unit="%"
+          tone={data && data.achievementSewing >= 100 ? "green" : data && data.achievementSewing < 90 ? "red" : undefined}
+        />
+        <KpiCard
+          eyebrow="Achievement Distribusi"
+          value={data ? data.achievementDistribusi.toFixed(1) : "-"}
+          unit="%"
+          tone={data && data.achievementDistribusi >= 100 ? "green" : data && data.achievementDistribusi < 90 ? "red" : undefined}
+        />
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        {groups.map((g) => (
-          <Panel key={g.style} title={`${g.style}${g.buyer ? " \u00b7 " + g.buyer : ""}`}>
-            <table
-              style={{
-                width: "100%",
-                borderCollapse: "collapse",
-                fontFamily: "var(--font-mono)",
-                fontSize: 13,
-              }}
-            >
-              <thead>
-                <tr style={{ textAlign: "left", color: "var(--text-faint)" }}>
-                  <th style={{ padding: "6px 10px" }}>Line</th>
-                  <th style={{ padding: "6px 10px", textAlign: "right" }}>Target Kanan</th>
-                  <th style={{ padding: "6px 10px", textAlign: "right" }}>Target Kiri</th>
-                  <th style={{ padding: "6px 10px", textAlign: "right" }}>Aktual Kanan</th>
-                  <th style={{ padding: "6px 10px", textAlign: "right" }}>Aktual Kiri</th>
-                  <th style={{ padding: "6px 10px", textAlign: "right" }}>Efisiensi Kanan</th>
-                  <th style={{ padding: "6px 10px", textAlign: "right" }}>Efisiensi Kiri</th>
-                </tr>
-              </thead>
-              <tbody>
-                {g.lines.map((l, i) => (
-                  <tr key={i} style={{ borderTop: "1px solid var(--steel)" }}>
-                    <td style={{ padding: "6px 10px" }}>{l.line}</td>
-                    <td style={{ padding: "6px 10px", textAlign: "right" }}>{l.targetKanan}</td>
-                    <td style={{ padding: "6px 10px", textAlign: "right" }}>{l.targetKiri}</td>
-                    <td style={{ padding: "6px 10px", textAlign: "right" }}>{l.actualKanan}</td>
-                    <td style={{ padding: "6px 10px", textAlign: "right" }}>{l.actualKiri}</td>
-                    <td
-                      style={{
-                        padding: "6px 10px",
-                        textAlign: "right",
-                        color: l.effKanan >= 100 ? "var(--green)" : l.effKanan >= 85 ? "var(--amber)" : "var(--red)",
-                      }}
-                    >
-                      {l.effKanan.toFixed(1)}%
-                    </td>
-                    <td
-                      style={{
-                        padding: "6px 10px",
-                        textAlign: "right",
-                        color: l.effKiri >= 100 ? "var(--green)" : l.effKiri >= 85 ? "var(--amber)" : "var(--red)",
-                      }}
-                    >
-                      {l.effKiri.toFixed(1)}%
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </Panel>
-        ))}
-        {groups.length === 0 && (
-          <div style={{ color: "var(--text-faint)", fontSize: 13 }}>Belum ada data.</div>
-        )}
+      <p
+        style={{
+          fontFamily: "var(--font-display)",
+          fontSize: 12,
+          letterSpacing: "0.1em",
+          color: "var(--text-faint)",
+          textTransform: "uppercase",
+          marginBottom: 10,
+        }}
+      >
+        Monitoring Shipment (akumulasi)
+      </p>
+      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 24 }}>
+        <KpiCard
+          eyebrow="Kekurangan Produksi"
+          value={(shipment.totalKekuranganProduksi ?? 0).toLocaleString("id-ID")}
+          tone="red"
+        />
+        <KpiCard
+          eyebrow="Kekurangan Envelope"
+          value={(shipment.totalKekuranganEnvelope ?? 0).toLocaleString("id-ID")}
+          tone="red"
+        />
+        <KpiCard eyebrow="Qty Shipment" value={(shipment.totalQtyShipment ?? 0).toLocaleString("id-ID")} />
+        <KpiCard eyebrow="Qty Shipment Pack" value={(shipment.totalQtyShipmentPack ?? 0).toLocaleString("id-ID")} />
       </div>
+
+      <Panel>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+          <span style={{ color: "var(--teal)", fontSize: 14 }}>&#10022;</span>
+          <span
+            style={{
+              fontFamily: "var(--font-display)",
+              fontSize: 12,
+              letterSpacing: "0.1em",
+              color: "var(--text-faint)",
+              textTransform: "uppercase",
+            }}
+          >
+            Analisa dan Rekomendasi AI
+          </span>
+        </div>
+        {analysisLoading ? (
+          <p style={{ fontSize: 13, color: "var(--text-faint)", margin: 0 }}>Menganalisa data...</p>
+        ) : analysisError ? (
+          <p style={{ fontSize: 13, color: "var(--red)", margin: 0 }}>{analysisError}</p>
+        ) : (
+          <p style={{ fontSize: 14, lineHeight: 1.6, color: "var(--text)", margin: 0, whiteSpace: "pre-wrap" }}>
+            {analysis}
+          </p>
+        )}
+      </Panel>
     </div>
   );
 }

@@ -93,7 +93,7 @@ export default function AsikSolution() {
             key={i}
             style={{
               alignSelf: m.role === "user" ? "flex-end" : "flex-start",
-              background: m.role === "user" ? "var(--amber)" : "var(--panel-raised)",
+              background: m.role === "user" ? "var(--teal)" : "var(--panel-raised)",
               color: m.role === "user" ? "#1b1e20" : "var(--text)",
               padding: "10px 14px",
               borderRadius: 6,
@@ -156,7 +156,7 @@ export default function AsikSolution() {
           onClick={sendMessage}
           disabled={loading || !input.trim()}
           style={{
-            background: "var(--amber)",
+            background: "var(--teal)",
             color: "#1b1e20",
             border: "none",
             borderRadius: 4,
