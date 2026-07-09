@@ -10,6 +10,11 @@ import { getYesterdayGroupRows } from "@/lib/dateUtils";
 
 export const dynamic = "force-dynamic";
 
+function safeFixed(val, digits = 1) {
+  const n = Number(val);
+  return Number.isFinite(n) ? n.toFixed(digits) : "-";
+}
+
 async function buildContextSummary() {
   const [paRows, wipSummary, planSewRows, planDistRows, gudangSummary] = await Promise.all([
     getPaData().catch(() => []),
@@ -21,7 +26,7 @@ async function buildContextSummary() {
 
   const latestPa = paRows.length > 0 ? paRows[paRows.length - 1] : null;
   const paText = latestPa
-    ? `PA terbaru (${latestPa.tanggal}): Supply ${latestPa.supply.toFixed(2)}%, Sewing ${latestPa.sewing.toFixed(2)}%, Gudang Jadi ${latestPa.gudangJadi.toFixed(2)}%, Factory ${latestPa.factory.toFixed(2)}%.`
+    ? `PA terbaru (${latestPa.tanggal}): Supply ${safeFixed(latestPa.supply, 2)}%, Sewing ${safeFixed(latestPa.sewing, 2)}%, Gudang Jadi ${safeFixed(latestPa.gudangJadi, 2)}%, Factory ${safeFixed(latestPa.factory, 2)}%.`
     : "Data PA belum tersedia.";
 
   const wipText = wipSummary
@@ -31,13 +36,13 @@ async function buildContextSummary() {
   const sewYesterday = getYesterdayGroupRows(planSewRows, "tanggal");
   const sewText =
     sewYesterday.length > 0
-      ? `Achievement Sewing kemarin per style: ${sewYesterday.map((r) => `${r.style} (SPO ${r.spo}) ${r.achievement.toFixed(1)}%`).join(", ")}.`
+      ? `Achievement Sewing kemarin per style: ${sewYesterday.map((r) => `${r.style} (SPO ${r.spo}) ${safeFixed(r.achievement, 1)}%`).join(", ")}.`
       : "Data achievement sewing belum tersedia.";
 
   const distYesterday = getYesterdayGroupRows(planDistRows, "tanggal");
   const distText =
     distYesterday.length > 0
-      ? `Achievement Distribusi kemarin per Fact: ${distYesterday.map((r) => `${r.fact} ${r.achievement.toFixed(1)}%`).join(", ")}.`
+      ? `Achievement Distribusi kemarin per Fact: ${distYesterday.map((r) => `${r.fact} ${safeFixed(r.achievement, 1)}%`).join(", ")}.`
       : "Data achievement distribusi belum tersedia.";
 
   const shipmentText = gudangSummary

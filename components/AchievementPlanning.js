@@ -4,6 +4,11 @@ import { useEffect, useState } from "react";
 import KpiCard from "./KpiCard";
 import Panel from "./Panel";
 
+function safeFixed(val, digits = 1) {
+  const n = Number(val);
+  return Number.isFinite(n) ? n.toFixed(digits) : "-";
+}
+
 export default function AchievementPlanning() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -104,13 +109,13 @@ export default function AchievementPlanning() {
       <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 24 }}>
         <KpiCard
           eyebrow="Achievement Sewing"
-          value={data ? data.achievementSewing.toFixed(1) : "-"}
+          value={data ? safeFixed(data.achievementSewing, 1) : "-"}
           unit="%"
           tone={data && data.achievementSewing >= 100 ? "green" : data && data.achievementSewing < 90 ? "red" : undefined}
         />
         <KpiCard
           eyebrow="Achievement Distribusi"
-          value={data ? data.achievementDistribusi.toFixed(1) : "-"}
+          value={data ? safeFixed(data.achievementDistribusi, 1) : "-"}
           unit="%"
           tone={data && data.achievementDistribusi >= 100 ? "green" : data && data.achievementDistribusi < 90 ? "red" : undefined}
         />

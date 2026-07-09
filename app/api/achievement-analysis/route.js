@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
-import { getPlanDistData, getGudangJadiData, getGudangJadiSummary, getPlanSewData } from "@/lib/sheets";
+import { getPlanSewData, getGudangJadiData, getGudangJadiSummary } from "@/lib/sheets";
 import { getYesterdayGroupRows } from "@/lib/dateUtils";
 
 export const dynamic = "force-dynamic";
+
+function safeFixed(val, digits = 1) {
+  const n = Number(val);
+  return Number.isFinite(n) ? n.toFixed(digits) : "-";
+}
 
 function topShortages(rows, field, n = 3) {
   return rows
@@ -21,17 +26,15 @@ export async function GET() {
       );
     }
 
-    const [planSewRows, planDistRows, gudangRows, gudangSummary] = await Promise.all([
+    const [planSewRows, gudangRows, gudangSummary] = await Promise.all([
       getPlanSewData(),
-      getPlanDistData(),
       getGudangJadiData(),
       getGudangJadiSummary(),
     ]);
 
     const sewYesterday = getYesterdayGroupRows(planSewRows, "tanggal");
-    const distYesterday = getYesterdayGroupRows(planDistRows, "tanggal");
 
-    const lowAchievementStyles = distYesterday
+    const lowAchievementStyles = sewYesterday
       .filter((r) => r.achievement < 100)
       .sort((a, b) => a.achievement - b.achievement)
       .slice(0, 3);
@@ -41,11 +44,8 @@ export async function GET() {
 
     const dataSummary = `Data Achievement Planning (data kemarin, kecuali disebutkan lain):
 
-Achievement Sewing per Fact (dari Plan_SEWvsACT):
-${sewYesterday.map((r) => `- ${r.fact}: plan ${r.plan}, aktual ${r.actual}, achv ${r.achv.toFixed(1)}%`).join("\n") || "Tidak ada data"}
-
-Style/SPO dengan achievement distribusi terendah (dari PLAN_DISTvsACT):
-${lowAchievementStyles.map((r) => `- SPO ${r.spo} - ${r.style} (line ${r.line}): achievement ${r.achievement.toFixed(1)}%, gap ${r.gap}`).join("\n") || "Tidak ada yang di bawah 100%"}
+Style/SPO dengan achievement sewing terendah kemarin (dari Plan_SEWvsACT):
+${lowAchievementStyles.map((r) => `- SPO ${r.spo} - ${r.style} (line ${r.line}): achievement ${safeFixed(r.achievement, 1)}%, gap ${r.gap}`).join("\n") || "Tidak ada yang di bawah 100%"}
 
 SPO/style dengan kekurangan produksi terbesar (dari gudang jadi, akumulasi):
 ${topKekuranganProduksi.map((r) => `- SPO ${r.spo} - ${r.style}: kekurangan ${r.kekuranganProduksi}`).join("\n") || "Tidak ada kekurangan"}

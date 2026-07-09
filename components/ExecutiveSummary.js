@@ -4,6 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import KpiCard from "./KpiCard";
 import Panel from "./Panel";
 
+function safeFixed(val, digits = 2) {
+  const n = Number(val);
+  return Number.isFinite(n) ? n.toFixed(digits) : "-";
+}
+
 export default function ExecutiveSummary() {
   const [paRows, setPaRows] = useState([]);
   const [wipSummary, setWipSummary] = useState(null);
@@ -88,15 +93,15 @@ export default function ExecutiveSummary() {
         PA per departemen {latestPa ? `- ${latestPa.tanggal}` : ""}
       </p>
       <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 24 }}>
-        <KpiCard eyebrow="PA Supply" value={latestPa ? latestPa.supply.toFixed(2) : "-"} unit="%" />
-        <KpiCard eyebrow="PA Sewing" value={latestPa ? latestPa.sewing.toFixed(2) : "-"} unit="%" />
+        <KpiCard eyebrow="PA Supply" value={latestPa ? safeFixed(latestPa.supply, 2) : "-"} unit="%" />
+        <KpiCard eyebrow="PA Sewing" value={latestPa ? safeFixed(latestPa.sewing, 2) : "-"} unit="%" />
         <KpiCard
           eyebrow="PA Gudang Jadi"
-          value={latestPa ? latestPa.gudangJadi.toFixed(2) : "-"}
+          value={latestPa ? safeFixed(latestPa.gudangJadi, 2) : "-"}
           unit="%"
           tone={latestPa && latestPa.gudangJadi >= 100 ? "green" : undefined}
         />
-        <KpiCard eyebrow="PA Factory" value={latestPa ? latestPa.factory.toFixed(2) : "-"} unit="%" />
+        <KpiCard eyebrow="PA Factory" value={latestPa ? safeFixed(latestPa.factory, 2) : "-"} unit="%" />
       </div>
 
       <p
