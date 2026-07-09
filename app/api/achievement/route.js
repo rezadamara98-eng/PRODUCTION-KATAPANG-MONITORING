@@ -13,12 +13,12 @@ export async function GET() {
     ]);
 
     const sewYesterday = getLastCompleteGroupRows(planSewRows, "tanggal", "achievement");
-    const validSew = sewYesterday.filter((r) => Number.isFinite(r.achievement));
+    const validSew = sewYesterday.filter((r) => Number.isFinite(r.achievement) && r.planSew > 0);
     const achievementSewing =
       validSew.length > 0 ? validSew.reduce((sum, r) => sum + r.achievement, 0) / validSew.length : 0;
 
     const distYesterday = getLastCompleteGroupRows(planDistRows, "tanggal", "achievement");
-    const validDist = distYesterday.filter((r) => Number.isFinite(r.achievement));
+    const validDist = distYesterday.filter((r) => Number.isFinite(r.achievement) && r.plan > 0);
     const achievementDistribusi =
       validDist.length > 0 ? validDist.reduce((sum, r) => sum + r.achievement, 0) / validDist.length : 0;
 

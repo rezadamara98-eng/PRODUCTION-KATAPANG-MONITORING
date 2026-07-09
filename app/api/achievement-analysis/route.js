@@ -35,7 +35,7 @@ export async function GET() {
     const sewYesterday = getLastCompleteGroupRows(planSewRows, "tanggal", "achievement");
 
     const lowAchievementStyles = sewYesterday
-      .filter((r) => r.achievement < 100)
+      .filter((r) => r.planSew > 0 && r.achievement < 100)
       .sort((a, b) => a.achievement - b.achievement)
       .slice(0, 3);
 
