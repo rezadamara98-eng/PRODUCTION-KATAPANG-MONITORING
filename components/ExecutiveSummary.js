@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import KpiCard from "./KpiCard";
 import Panel from "./Panel";
+import { getYesterdayRow } from "@/lib/dateUtils";
 
 function safeFixed(val, digits = 2) {
   const n = Number(val);
@@ -47,7 +48,7 @@ export default function ExecutiveSummary() {
     };
   }, []);
 
-  const latestPa = paRows.length > 0 ? paRows[paRows.length - 1] : null;
+  const latestPa = useMemo(() => getYesterdayRow(paRows, "tanggal"), [paRows]);
 
   const maxWipLine = useMemo(
     () => Math.max(1, ...wipLineData.map((l) => l.totalWip)),

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getPlanSewData, getGudangJadiData, getGudangJadiSummary } from "@/lib/sheets";
-import { getYesterdayGroupRows } from "@/lib/dateUtils";
+import { getLastCompleteGroupRows } from "@/lib/dateUtils";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +32,7 @@ export async function GET() {
       getGudangJadiSummary(),
     ]);
 
-    const sewYesterday = getYesterdayGroupRows(planSewRows, "tanggal");
+    const sewYesterday = getLastCompleteGroupRows(planSewRows, "tanggal", "achievement");
 
     const lowAchievementStyles = sewYesterday
       .filter((r) => r.achievement < 100)

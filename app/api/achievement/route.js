@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getPlanSewData, getPlanDistData, getGudangJadiData, getGudangJadiSummary } from "@/lib/sheets";
-import { getYesterdayGroupRows } from "@/lib/dateUtils";
+import { getLastCompleteGroupRows } from "@/lib/dateUtils";
 
 export const dynamic = "force-dynamic";
 
@@ -12,17 +12,15 @@ export async function GET() {
       getGudangJadiSummary(),
     ]);
 
-    const sewYesterday = getYesterdayGroupRows(planSewRows, "tanggal");
+    const sewYesterday = getLastCompleteGroupRows(planSewRows, "tanggal", "achievement");
+    const validSew = sewYesterday.filter((r) => Number.isFinite(r.achievement));
     const achievementSewing =
-      sewYesterday.length > 0
-        ? sewYesterday.reduce((sum, r) => sum + r.achv, 0) / sewYesterday.length
-        : 0;
+      validSew.length > 0 ? validSew.reduce((sum, r) => sum + r.achievement, 0) / validSew.length : 0;
 
-    const distYesterday = getYesterdayGroupRows(planDistRows, "tanggal");
+    const distYesterday = getLastCompleteGroupRows(planDistRows, "tanggal", "achievement");
+    const validDist = distYesterday.filter((r) => Number.isFinite(r.achievement));
     const achievementDistribusi =
-      distYesterday.length > 0
-        ? distYesterday.reduce((sum, r) => sum + r.achievement, 0) / distYesterday.length
-        : 0;
+      validDist.length > 0 ? validDist.reduce((sum, r) => sum + r.achievement, 0) / validDist.length : 0;
 
     return NextResponse.json({
       achievementSewing,
@@ -31,6 +29,14 @@ export async function GET() {
       distYesterday,
       shipment: gudangSummary,
       fetchedAt: new Date().toISOString(),
+      debug: {
+        totalPlanSewRows: planSewRows.length,
+        totalPlanDistRows: planDistRows.length,
+        samplePlanSewRow: planSewRows[0] || null,
+        samplePlanDistRow: planDistRows[0] || null,
+        lastPlanSewRow: planSewRows[planSewRows.length - 1] || null,
+        lastPlanDistRow: planDistRows[planDistRows.length - 1] || null,
+      },
     });
   } catch (err) {
     console.error("Gagal mengambil data Achievement Planning:", err);

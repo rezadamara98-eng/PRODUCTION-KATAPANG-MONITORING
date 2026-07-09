@@ -6,7 +6,7 @@ import {
   getPlanDistData,
   getGudangJadiSummary,
 } from "@/lib/sheets";
-import { getYesterdayGroupRows } from "@/lib/dateUtils";
+import { getYesterdayGroupRows, getLastCompleteGroupRows } from "@/lib/dateUtils";
 
 export const dynamic = "force-dynamic";
 
@@ -33,13 +33,13 @@ async function buildContextSummary() {
     ? `Total WIP kemarin: Distribusi ${wipSummary.distribusi.total}, Cutting Synthetic ${wipSummary.cuttingSynthetic.total}, Cutting Leather ${wipSummary.cuttingKulit.total}.`
     : "Data WIP belum tersedia.";
 
-  const sewYesterday = getYesterdayGroupRows(planSewRows, "tanggal");
+  const sewYesterday = getLastCompleteGroupRows(planSewRows, "tanggal", "achievement");
   const sewText =
     sewYesterday.length > 0
       ? `Achievement Sewing kemarin per style: ${sewYesterday.map((r) => `${r.style} (SPO ${r.spo}) ${safeFixed(r.achievement, 1)}%`).join(", ")}.`
       : "Data achievement sewing belum tersedia.";
 
-  const distYesterday = getYesterdayGroupRows(planDistRows, "tanggal");
+  const distYesterday = getLastCompleteGroupRows(planDistRows, "tanggal", "achievement");
   const distText =
     distYesterday.length > 0
       ? `Achievement Distribusi kemarin per Fact: ${distYesterday.map((r) => `${r.fact} ${safeFixed(r.achievement, 1)}%`).join(", ")}.`
