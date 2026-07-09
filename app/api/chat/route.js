@@ -31,13 +31,13 @@ async function buildContextSummary() {
   const sewYesterday = getYesterdayGroupRows(planSewRows, "tanggal");
   const sewText =
     sewYesterday.length > 0
-      ? `Achievement Sewing kemarin per Fact: ${sewYesterday.map((r) => `${r.fact} ${r.achv.toFixed(1)}%`).join(", ")}.`
+      ? `Achievement Sewing kemarin per style: ${sewYesterday.map((r) => `${r.style} (SPO ${r.spo}) ${r.achievement.toFixed(1)}%`).join(", ")}.`
       : "Data achievement sewing belum tersedia.";
 
   const distYesterday = getYesterdayGroupRows(planDistRows, "tanggal");
   const distText =
     distYesterday.length > 0
-      ? `Achievement Distribusi kemarin per style: ${distYesterday.map((r) => `${r.style} (SPO ${r.spo}) ${r.achievement.toFixed(1)}%`).join(", ")}.`
+      ? `Achievement Distribusi kemarin per Fact: ${distYesterday.map((r) => `${r.fact} ${r.achievement.toFixed(1)}%`).join(", ")}.`
       : "Data achievement distribusi belum tersedia.";
 
   const shipmentText = gudangSummary
