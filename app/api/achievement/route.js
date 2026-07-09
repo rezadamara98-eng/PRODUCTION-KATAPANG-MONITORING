@@ -29,14 +29,6 @@ export async function GET() {
       distYesterday,
       shipment: gudangSummary,
       fetchedAt: new Date().toISOString(),
-      debug: {
-        totalPlanSewRows: planSewRows.length,
-        totalPlanDistRows: planDistRows.length,
-        samplePlanSewRow: planSewRows[0] || null,
-        samplePlanDistRow: planDistRows[0] || null,
-        lastPlanSewRow: planSewRows[planSewRows.length - 1] || null,
-        lastPlanDistRow: planDistRows[planDistRows.length - 1] || null,
-      },
     });
   } catch (err) {
     console.error("Gagal mengambil data Achievement Planning:", err);
