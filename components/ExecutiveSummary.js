@@ -94,15 +94,14 @@ export default function ExecutiveSummary() {
         PA per departemen {latestPa ? `- ${latestPa.tanggal}` : ""}
       </p>
       <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 24 }}>
-        <KpiCard eyebrow="PA Supply" value={latestPa ? safeFixed(latestPa.supply, 2) : "-"} unit="%" />
-        <KpiCard eyebrow="PA Sewing" value={latestPa ? safeFixed(latestPa.sewing, 2) : "-"} unit="%" />
+        <KpiCard eyebrow="PA Supply" value={latestPa ? safeFixed(latestPa.supply, 2) : "-"} />
+        <KpiCard eyebrow="PA Sewing" value={latestPa ? safeFixed(latestPa.sewing, 2) : "-"} />
         <KpiCard
           eyebrow="PA Gudang Jadi"
           value={latestPa ? safeFixed(latestPa.gudangJadi, 2) : "-"}
-          unit="%"
           tone={latestPa && latestPa.gudangJadi >= 100 ? "green" : undefined}
         />
-        <KpiCard eyebrow="PA Factory" value={latestPa ? safeFixed(latestPa.factory, 2) : "-"} unit="%" />
+        <KpiCard eyebrow="PA Factory" value={latestPa ? safeFixed(latestPa.factory, 2) : "-"} />
       </div>
 
       <p
