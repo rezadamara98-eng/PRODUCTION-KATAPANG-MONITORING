@@ -186,6 +186,12 @@ export default function GloveTracking() {
           )}
 
           <Panel title="Hasil Pencarian di SPO TRACK">
+            {result.matchedBoxes.length > 0 && !result.exactMatch && (
+              <p style={{ fontSize: 12, color: "var(--amber, #f2a900)", marginTop: 0, marginBottom: 10 }}>
+                Tidak ada box yang persis cocok (SPO + No Proses). Menampilkan semua box dengan SPO{" "}
+                {result.decoded.noSpo}.
+              </p>
+            )}
             <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "var(--font-mono)", fontSize: 13 }}>
               <thead>
                 <tr style={{ textAlign: "left", color: "var(--text-faint)" }}>
