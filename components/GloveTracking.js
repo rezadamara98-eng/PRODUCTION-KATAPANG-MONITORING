@@ -4,6 +4,16 @@ import { useState } from "react";
 import Panel from "./Panel";
 import KpiCard from "./KpiCard";
 
+function sortSewingOperators(ops) {
+  return [...ops].sort((a, b) => {
+    const aIsLeader = a.skill.trim().toUpperCase() === "LEADER SEWING";
+    const bIsLeader = b.skill.trim().toUpperCase() === "LEADER SEWING";
+    if (aIsLeader && !bIsLeader) return -1;
+    if (!aIsLeader && bIsLeader) return 1;
+    return a.skill.localeCompare(b.skill);
+  });
+}
+
 export default function GloveTracking() {
   const [serial1, setSerial1] = useState("");
   const [serial2, setSerial2] = useState("");
@@ -163,7 +173,7 @@ export default function GloveTracking() {
                       </tr>
                     </thead>
                     <tbody>
-                      {(result.sewingOperatorsByLine[line] || []).map((op, i) => (
+                      {sortSewingOperators(result.sewingOperatorsByLine[line] || []).map((op, i) => (
                         <tr key={i} style={{ borderTop: "1px solid var(--steel)" }}>
                           <td style={{ padding: "6px 10px" }}>{op.nama}</td>
                           <td style={{ padding: "6px 10px", color: "var(--text-muted)" }}>{op.skill}</td>
