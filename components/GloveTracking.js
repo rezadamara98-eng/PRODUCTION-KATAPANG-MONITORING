@@ -160,7 +160,6 @@ export default function GloveTracking() {
                       <tr style={{ textAlign: "left", color: "var(--text-faint)" }}>
                         <th style={{ padding: "6px 10px" }}>Nama</th>
                         <th style={{ padding: "6px 10px" }}>Skill</th>
-                        <th style={{ padding: "6px 10px" }}>Style</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -168,12 +167,11 @@ export default function GloveTracking() {
                         <tr key={i} style={{ borderTop: "1px solid var(--steel)" }}>
                           <td style={{ padding: "6px 10px" }}>{op.nama}</td>
                           <td style={{ padding: "6px 10px", color: "var(--text-muted)" }}>{op.skill}</td>
-                          <td style={{ padding: "6px 10px", color: "var(--text-muted)" }}>{op.style}</td>
                         </tr>
                       ))}
                       {(result.sewingOperatorsByLine[line] || []).length === 0 && (
                         <tr>
-                          <td colSpan={3} style={{ padding: "10px", color: "var(--text-faint)" }}>
+                          <td colSpan={2} style={{ padding: "10px", color: "var(--text-faint)" }}>
                             Belum ada data operator sewing untuk line ini.
                           </td>
                         </tr>
