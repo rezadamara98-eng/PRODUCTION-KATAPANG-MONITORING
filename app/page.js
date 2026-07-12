@@ -5,6 +5,7 @@ import ExecutiveSummary from "@/components/ExecutiveSummary";
 import DashboardProduction from "@/components/DashboardProduction";
 import AchievementPlanning from "@/components/AchievementPlanning";
 import ManpowerKapasitas from "@/components/ManpowerKapasitas";
+import GloveTracking from "@/components/GloveTracking";
 import AsikSolution from "@/components/AsikSolution";
 import Logo from "@/components/Logo";
 
@@ -13,6 +14,7 @@ const TABS = [
   { key: "prod", label: "Dashboard Production" },
   { key: "plan", label: "Achievement Planning" },
   { key: "mp", label: "Manpower dan Kapasitas" },
+  { key: "glove", label: "Glove Tracking" },
   { key: "asik", label: "ASIK Solution" },
 ];
 
@@ -86,6 +88,7 @@ export default function Home() {
       {active === "prod" && <DashboardProduction />}
       {active === "plan" && <AchievementPlanning />}
       {active === "mp" && <ManpowerKapasitas />}
+      {active === "glove" && <GloveTracking />}
       {active === "asik" && <AsikSolution />}
     </main>
   );
