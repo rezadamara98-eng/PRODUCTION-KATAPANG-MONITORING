@@ -16,7 +16,9 @@ function todayStr() {
 export default function CapacityPlanner() {
   const [styleOptions, setStyleOptions] = useState([]);
   const [style, setStyle] = useState("");
-  const [qty, setQty] = useState("");
+  const [qtyKanan, setQtyKanan] = useState("");
+  const [qtyKiri, setQtyKiri] = useState("");
+  const [qtyWomen, setQtyWomen] = useState("");
   const [startDate, setStartDate] = useState(todayStr());
   const [finishDate, setFinishDate] = useState("");
   const [result, setResult] = useState(null);
@@ -40,6 +42,8 @@ export default function CapacityPlanner() {
     };
   }, []);
 
+  const hasAnyQty = Number(qtyKanan) > 0 || Number(qtyKiri) > 0 || Number(qtyWomen) > 0;
+
   async function handleCalculate() {
     setLoading(true);
     setError(null);
@@ -48,7 +52,7 @@ export default function CapacityPlanner() {
       const res = await fetch("/api/capacity-planner/calculate", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ style, qty, startDate, finishDate }),
+        body: JSON.stringify({ style, qtyKanan, qtyKiri, qtyWomen, startDate, finishDate }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Gagal menghitung.");
@@ -80,7 +84,7 @@ export default function CapacityPlanner() {
   return (
     <div>
       <Panel title="Masukkan Detail Order" style={{ marginBottom: 24 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 14 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 12 }}>
           <div>
             <label style={labelStyle}>Style</label>
             <input
@@ -97,16 +101,6 @@ export default function CapacityPlanner() {
             </datalist>
           </div>
           <div>
-            <label style={labelStyle}>Total Qty (pasang)</label>
-            <input
-              type="number"
-              value={qty}
-              onChange={(e) => setQty(e.target.value)}
-              placeholder="12000"
-              style={inputStyle}
-            />
-          </div>
-          <div>
             <label style={labelStyle}>Tanggal Mulai</label>
             <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} style={inputStyle} />
           </div>
@@ -115,9 +109,25 @@ export default function CapacityPlanner() {
             <input type="date" value={finishDate} onChange={(e) => setFinishDate(e.target.value)} style={inputStyle} />
           </div>
         </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 14 }}>
+          <div>
+            <label style={labelStyle}>Qty Kanan (pcs)</label>
+            <input type="number" value={qtyKanan} onChange={(e) => setQtyKanan(e.target.value)} placeholder="4000" style={inputStyle} />
+          </div>
+          <div>
+            <label style={labelStyle}>Qty Kiri (pcs)</label>
+            <input type="number" value={qtyKiri} onChange={(e) => setQtyKiri(e.target.value)} placeholder="4000" style={inputStyle} />
+          </div>
+          <div>
+            <label style={labelStyle}>Qty Women (pcs)</label>
+            <input type="number" value={qtyWomen} onChange={(e) => setQtyWomen(e.target.value)} placeholder="0" style={inputStyle} />
+          </div>
+        </div>
+
         <button
           onClick={handleCalculate}
-          disabled={loading || !style || !qty || !finishDate}
+          disabled={loading || !style || !hasAnyQty || !finishDate}
           style={{
             background: "var(--teal)",
             color: "var(--navy)",
@@ -126,7 +136,7 @@ export default function CapacityPlanner() {
             padding: "9px 24px",
             fontSize: 13,
             cursor: loading ? "default" : "pointer",
-            opacity: loading || !style || !qty || !finishDate ? 0.6 : 1,
+            opacity: loading || !style || !hasAnyQty || !finishDate ? 0.6 : 1,
           }}
         >
           {loading ? "Menghitung..." : "Hitung Kebutuhan"}
@@ -151,31 +161,131 @@ export default function CapacityPlanner() {
       {result && (
         <>
           <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 24 }}>
-            <div style={{ flex: "1 1 300px", background: "var(--panel)", border: "1px solid var(--steel)", borderLeft: "4px solid var(--navy)", padding: "18px 20px" }}>
-              <p style={{ fontSize: 11, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 8px" }}>
-                Line Dibutuhkan
-              </p>
-              <p style={{ fontSize: 34, fontWeight: 700, color: "var(--navy)", margin: 0 }}>
-                {result.linesNeeded ?? "-"} <span style={{ fontSize: 15, color: "var(--text-muted)", fontWeight: 400 }}>line</span>
-              </p>
-              {result.refStyle && (
-                <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "8px 0 0" }}>
-                  Berdasarkan PA PAF rata-rata {safeFixed(result.refStyle.avgPaPaf, 2)}, {result.workingDays} hari kerja efektif
+            {result.qtyKanan > 0 && (
+              <div style={{ flex: "1 1 220px", background: "var(--panel)", border: "1px solid var(--steel)", borderLeft: "4px solid var(--navy)", padding: "18px 20px" }}>
+                <p style={{ fontSize: 11, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 8px" }}>
+                  Line Kanan Dibutuhkan
                 </p>
-              )}
-            </div>
-            <div style={{ flex: "1 1 300px", background: "var(--panel)", border: "1px solid var(--steel)", borderLeft: "4px solid var(--teal)", padding: "18px 20px" }}>
+                <p style={{ fontSize: 30, fontWeight: 700, color: "var(--navy)", margin: 0 }}>
+                  {result.linesKanan ?? "-"} <span style={{ fontSize: 14, color: "var(--text-muted)", fontWeight: 400 }}>line</span>
+                </p>
+                <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "8px 0 0" }}>
+                  Qty {result.qtyKanan.toLocaleString("id-ID")} pcs, kapasitas {safeFixed(result.capacityKananPerLine, 0)} pcs/line
+                </p>
+              </div>
+            )}
+            {result.qtyKiri > 0 && (
+              <div style={{ flex: "1 1 220px", background: "var(--panel)", border: "1px solid var(--steel)", borderLeft: "4px solid var(--navy)", padding: "18px 20px" }}>
+                <p style={{ fontSize: 11, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 8px" }}>
+                  Line Kiri Dibutuhkan
+                </p>
+                <p style={{ fontSize: 30, fontWeight: 700, color: "var(--navy)", margin: 0 }}>
+                  {result.linesKiri ?? "-"} <span style={{ fontSize: 14, color: "var(--text-muted)", fontWeight: 400 }}>line</span>
+                </p>
+                <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "8px 0 0" }}>
+                  Qty {result.qtyKiri.toLocaleString("id-ID")} pcs, kapasitas {safeFixed(result.capacityKiriPerLine, 0)} pcs/line
+                </p>
+              </div>
+            )}
+            {result.qtyWomen > 0 && (
+              <div style={{ flex: "1 1 220px", background: "var(--panel)", border: "1px solid var(--steel)", borderLeft: "4px solid var(--navy)", padding: "18px 20px" }}>
+                <p style={{ fontSize: 11, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 8px" }}>
+                  Line Women Dibutuhkan
+                </p>
+                <p style={{ fontSize: 30, fontWeight: 700, color: "var(--navy)", margin: 0 }}>
+                  {result.linesWomen ?? "-"} <span style={{ fontSize: 14, color: "var(--text-muted)", fontWeight: 400 }}>line</span>
+                </p>
+                <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "8px 0 0" }}>
+                  Qty {result.qtyWomen.toLocaleString("id-ID")} pcs, kapasitas {safeFixed(result.capacityKananPerLine, 0)} pcs/line
+                </p>
+              </div>
+            )}
+            <div style={{ flex: "1 1 220px", background: "var(--panel)", border: "1px solid var(--steel)", borderLeft: "4px solid var(--teal)", padding: "18px 20px" }}>
               <p style={{ fontSize: 11, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 8px" }}>
                 Operator Cutting Dibutuhkan
               </p>
-              <p style={{ fontSize: 34, fontWeight: 700, color: "var(--navy)", margin: 0 }}>
-                {result.operatorsNeeded ?? "-"} <span style={{ fontSize: 15, color: "var(--text-muted)", fontWeight: 400 }}>orang</span>
+              <p style={{ fontSize: 30, fontWeight: 700, color: "var(--navy)", margin: 0 }}>
+                {result.operatorsNeeded ?? "-"} <span style={{ fontSize: 14, color: "var(--text-muted)", fontWeight: 400 }}>orang</span>
               </p>
               <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "8px 0 0" }}>
-                Berdasarkan kapasitas rata-rata {safeFixed(result.avgCuttingCapacityPerDay, 1)} psg/operator/hari
+                Kategori: {result.skillCategory || "tidak terdeteksi"} &middot; {safeFixed(result.avgCuttingCapacityPerDay, 1)} pcs/operator/hari
               </p>
             </div>
           </div>
+
+          {(result.suggestedLinesKanan?.length > 0 ||
+            result.suggestedLinesKiri?.length > 0 ||
+            result.suggestedLinesWomen?.length > 0) && (
+            <Panel title="Line yang Disarankan" style={{ marginBottom: 24 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                {result.suggestedLinesKanan?.length > 0 && (
+                  <div>
+                    <p style={{ fontSize: 12, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 6px" }}>
+                      Untuk Kanan
+                    </p>
+                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                      {result.suggestedLinesKanan.map((l, i) => (
+                        <div key={i} style={{ border: "1px solid var(--steel)", padding: "6px 12px", fontSize: 13, fontFamily: "var(--font-mono)" }}>
+                          <strong>{l.line}</strong> &middot; {l.capacity} pcs/hari &middot; eff {safeFixed(l.efficiency, 1)}%
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {result.suggestedLinesKiri?.length > 0 && (
+                  <div>
+                    <p style={{ fontSize: 12, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 6px" }}>
+                      Untuk Kiri
+                    </p>
+                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                      {result.suggestedLinesKiri.map((l, i) => (
+                        <div key={i} style={{ border: "1px solid var(--steel)", padding: "6px 12px", fontSize: 13, fontFamily: "var(--font-mono)" }}>
+                          <strong>{l.line}</strong> &middot; {l.capacity} pcs/hari &middot; eff {safeFixed(l.efficiency, 1)}%
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {result.suggestedLinesWomen?.length > 0 && (
+                  <div>
+                    <p style={{ fontSize: 12, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 6px" }}>
+                      Untuk Women
+                    </p>
+                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                      {result.suggestedLinesWomen.map((l, i) => (
+                        <div key={i} style={{ border: "1px solid var(--steel)", padding: "6px 12px", fontSize: 13, fontFamily: "var(--font-mono)" }}>
+                          <strong>{l.line}</strong> &middot; {l.capacity} pcs/hari &middot; eff {safeFixed(l.efficiency, 1)}%
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </Panel>
+          )}
+
+          {result.suggestedOperators?.length > 0 && (
+            <Panel title="Operator Cutting yang Disarankan" style={{ marginBottom: 24 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "var(--font-mono)", fontSize: 13 }}>
+                <thead>
+                  <tr style={{ textAlign: "left", color: "var(--text-faint)" }}>
+                    <th style={{ padding: "6px 10px" }}>Nama</th>
+                    <th style={{ padding: "6px 10px" }}>Job</th>
+                    <th style={{ padding: "6px 10px", textAlign: "right" }}>Kapasitas ({result.skillCategory})</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {result.suggestedOperators.map((o, i) => (
+                    <tr key={i} style={{ borderTop: "1px solid var(--steel)" }}>
+                      <td style={{ padding: "6px 10px" }}>{o.nama}</td>
+                      <td style={{ padding: "6px 10px", color: "var(--text-muted)" }}>{o.job}</td>
+                      <td style={{ padding: "6px 10px", textAlign: "right" }}>{o.kapasitas}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </Panel>
+          )}
 
           <Panel title="Aspek yang Perlu Diperhatikan">
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
