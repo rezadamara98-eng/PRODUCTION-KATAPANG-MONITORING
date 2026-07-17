@@ -6,6 +6,7 @@ import DashboardProduction from "@/components/DashboardProduction";
 import AchievementPlanning from "@/components/AchievementPlanning";
 import ManpowerKapasitas from "@/components/ManpowerKapasitas";
 import GloveTracking from "@/components/GloveTracking";
+import CapacityPlanner from "@/components/CapacityPlanner";
 import AsikSolution from "@/components/AsikSolution";
 import Logo from "@/components/Logo";
 
@@ -15,6 +16,7 @@ const TABS = [
   { key: "plan", label: "Achievement Planning" },
   { key: "mp", label: "Manpower dan Kapasitas" },
   { key: "glove", label: "Glove Tracking" },
+  { key: "capacity", label: "Perencanaan Kapasitas" },
   { key: "asik", label: "ASIK Solution" },
 ];
 
@@ -106,6 +108,7 @@ export default function Home() {
       {active === "plan" && <AchievementPlanning />}
       {active === "mp" && <ManpowerKapasitas />}
       {active === "glove" && <GloveTracking />}
+      {active === "capacity" && <CapacityPlanner />}
       {active === "asik" && <AsikSolution />}
 
       <div
