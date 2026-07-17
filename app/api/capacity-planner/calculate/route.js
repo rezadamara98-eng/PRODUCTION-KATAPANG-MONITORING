@@ -110,6 +110,8 @@ export async function POST(req) {
         .slice(0, operatorsNeeded)
         .map((r) => ({ nama: r.nama, kapasitas: r[skillCategory], job: r.job }));
     }
+
+    const considerations = [];
     if (refStyle) {
       considerations.push({
         type: refStyle.avgEfficiency >= 95 ? "ok" : "warning",
