@@ -16,6 +16,7 @@ import {
 } from "recharts";
 import KpiCard from "./KpiCard";
 import Panel from "./Panel";
+import { getYesterdayRow } from "@/lib/dateUtils";
 
 function safeFixed(val, digits = 1) {
   const n = Number(val);
@@ -114,7 +115,7 @@ export default function KatapangMonitoring() {
     );
   }
 
-  const latestPa = pa?.data?.length > 0 ? pa.data[pa.data.length - 1] : null;
+  const latestPa = getYesterdayRow(pa?.data || [], "tanggal");
   const wipSummary = wip?.summary;
   const wipLineData = wip?.lineData || [];
   const wipSewingTotal = wipLineData.reduce((sum, l) => sum + l.totalWip, 0);
