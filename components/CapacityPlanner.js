@@ -8,6 +8,53 @@ function safeFixed(val, digits = 1) {
   return Number.isFinite(n) ? n.toFixed(digits) : "-";
 }
 
+function CriticalPointsSection({ points }) {
+  if (!points) return null;
+  const { cutting = [], produksi = [] } = points;
+  if (cutting.length === 0 && produksi.length === 0) return null;
+
+  return (
+    <Panel title="Poin Kritis untuk Style Ini" style={{ marginBottom: 24 }}>
+      {cutting.length > 0 && (
+        <div style={{ marginBottom: produksi.length > 0 ? 18 : 0 }}>
+          <p style={{ fontSize: 11, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 8px" }}>
+            Poin Kritis Cutting (Material)
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {cutting.map((c, i) => (
+              <div key={i} style={{ background: "var(--panel-raised, #f4f6f9)", borderLeft: "3px solid var(--amber, #b3720f)", padding: "8px 12px" }}>
+                <p style={{ fontSize: 13, color: "var(--text)", margin: 0 }}>
+                  <strong>{c.karakterMaterial}</strong>
+                  {c.penyelesaianMasalah ? ` \u2014 ${c.penyelesaianMasalah}` : ""}
+                </p>
+                {c.poinPenting && (
+                  <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "4px 0 0" }}>{c.poinPenting}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {produksi.length > 0 && (
+        <div>
+          <p style={{ fontSize: 11, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 8px" }}>
+            Poin Kritis Produksi (Sewing)
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {produksi.map((p, i) => (
+              <div key={i} style={{ background: "var(--panel-raised, #f4f6f9)", borderLeft: "3px solid var(--teal)", padding: "8px 12px" }}>
+                <p style={{ fontSize: 13, color: "var(--text)", margin: 0 }}>
+                  <strong>{p.area}</strong> ({p.section}) &mdash; {p.description}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </Panel>
+  );
+}
+
 export default function CapacityPlanner() {
   const [styleOptions, setStyleOptions] = useState([]);
   const [style, setStyle] = useState("");
@@ -247,6 +294,8 @@ export default function CapacityPlanner() {
             </Panel>
           )}
 
+          <CriticalPointsSection points={result.criticalPoints} />
+
           <Panel title="Aspek yang Perlu Diperhatikan">
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {result.considerations.map((c, i) => (
@@ -280,7 +329,7 @@ export default function CapacityPlanner() {
                   {result.linesKananWomen ?? "-"} <span style={{ fontSize: 14, color: "var(--text-muted)", fontWeight: 400 }}>line</span>
                 </p>
                 <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "8px 0 0" }}>
-                  Qty {result.qtyKananWomen.toLocaleString("id-ID")} pcs, kapasitas {safeFixed(result.capacityKananPerLine, 0)} pcs/line
+                  Kapasitas line: {safeFixed(result.refStyle?.avgTargetKanan, 0)} pcs/jam
                 </p>
               </div>
             )}
@@ -293,7 +342,7 @@ export default function CapacityPlanner() {
                   {result.linesKiri ?? "-"} <span style={{ fontSize: 14, color: "var(--text-muted)", fontWeight: 400 }}>line</span>
                 </p>
                 <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "8px 0 0" }}>
-                  Qty {result.qtyKiri.toLocaleString("id-ID")} pcs, kapasitas {safeFixed(result.capacityKiriPerLine, 0)} pcs/line
+                  Kapasitas line: {safeFixed(result.refStyle?.avgTargetKiri, 0)} pcs/jam
                 </p>
               </div>
             )}
@@ -305,7 +354,10 @@ export default function CapacityPlanner() {
                 {result.operatorsNeeded ?? "-"} <span style={{ fontSize: 14, color: "var(--text-muted)", fontWeight: 400 }}>orang</span>
               </p>
               <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "8px 0 0" }}>
-                Kategori: {result.skillCategory || "tidak terdeteksi"} &middot; {safeFixed(result.avgCuttingCapacityPerHour, 1)} pcs/operator/jam
+                Kategori: {result.skillCategory || "tidak terdeteksi"} &middot; rata-rata {safeFixed(result.avgCuttingCapacityPerHour, 1)} pcs/jam
+                {result.operatorCapacityRange && (
+                  <> &middot; tertinggi {result.operatorCapacityRange.highest} &middot; terendah {result.operatorCapacityRange.lowest} pcs/jam</>
+                )}
               </p>
             </div>
           </div>
@@ -430,6 +482,8 @@ export default function CapacityPlanner() {
               </table>
             </Panel>
           )}
+
+          <CriticalPointsSection points={result.criticalPoints} />
 
           <Panel title="Aspek yang Perlu Diperhatikan">
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>

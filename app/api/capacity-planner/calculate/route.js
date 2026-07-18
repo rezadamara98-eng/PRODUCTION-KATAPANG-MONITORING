@@ -7,6 +7,7 @@ import {
   getSkillCategoryForStyle,
   getAverageSkillCuttingCapacity,
   getSkillMatrikCuttingData,
+  getCriticalPointsForStyle,
 } from "@/lib/sheets";
 import { calculateWorkingCapacity } from "@/lib/dateUtils";
 
@@ -125,6 +126,22 @@ export async function POST(req) {
     }
 
     const considerations = [];
+
+    // Poin kritis (cutting & produksi) khusus untuk style ini.
+    const criticalPoints = await getCriticalPointsForStyle(style);
+
+    // Rentang kapasitas operator di kategori skill ini (tertinggi/terendah).
+    let operatorCapacityRange = null;
+    if (skillCategory) {
+      const capsInCategory = skillMatrikRows.map((r) => r[skillCategory]).filter((v) => v > 0);
+      if (capsInCategory.length > 0) {
+        operatorCapacityRange = {
+          highest: Math.max(...capsInCategory),
+          lowest: Math.min(...capsInCategory),
+        };
+      }
+    }
+
     if (refStyle) {
       considerations.push({
         type: refStyle.avgEfficiency >= 95 ? "ok" : "warning",
@@ -207,6 +224,8 @@ export async function POST(req) {
         refStyle,
         skillCategory,
         avgCuttingCapacityPerHour: cuttingCap.average,
+        operatorCapacityRange,
+        criticalPoints,
         optionsKananWomen,
         optionsKiri,
         optionsOperators,
@@ -286,6 +305,8 @@ export async function POST(req) {
       suggestedOperators,
       skillCategory,
       avgCuttingCapacityPerHour: cuttingCap.average,
+      operatorCapacityRange,
+      criticalPoints,
       considerations,
     });
   } catch (err) {
