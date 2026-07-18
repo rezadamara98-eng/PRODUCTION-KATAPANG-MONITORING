@@ -54,7 +54,17 @@ function StationCard({ station, isBottleneck }) {
       }}
     >
       <p style={{ fontSize: 10, color: "var(--text-faint)", textTransform: "uppercase", margin: "0 0 4px" }}>{station.name}</p>
+      {station.lines && station.lines.length > 0 && (
+        <p style={{ fontSize: 10, color: "var(--text-muted)", margin: "0 0 4px" }}>
+          {station.lines.map((l) => l.line).join(", ")}
+        </p>
+      )}
       <p style={{ fontSize: 20, fontWeight: 700, color: "var(--navy)", margin: 0 }}>{station.rounded} <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 400 }}>org</span></p>
+      {station.hoursNeeded != null && (
+        <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "4px 0 0" }}>
+          jam kerja {safeFixed(station.hoursNeeded, 1)} jam
+        </p>
+      )}
       <p style={{ fontSize: 11, color: isBottleneck ? "var(--red)" : "var(--text-muted)", margin: "4px 0 0" }}>
         {isBottleneck ? "\u26A0 " : ""}buffer {safeFixed(station.bufferPercent, 1)}%
       </p>
@@ -93,7 +103,12 @@ function StationFlowDiagram({ stationFlow }) {
       <div style={{ display: "flex", justifyContent: "center", marginBottom: 4 }}>
         <StationCard station={byName["Presub"]} isBottleneck={isBn("Presub")} />
       </div>
-      <div style={arrowStyle}>&#8595; lanjut sewing (assembly), lalu ke gudang jadi</div>
+      <div style={arrowStyle}>&#8595; lanjut sewing (assembly)</div>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center", marginBottom: 4 }}>
+        <StationCard station={byName["Sewing Kanan"]} isBottleneck={isBn("Sewing Kanan")} />
+        <StationCard station={byName["Sewing Kiri"]} isBottleneck={isBn("Sewing Kiri")} />
+      </div>
+      <div style={arrowStyle}>&#8595; lanjut ke gudang jadi</div>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
         <StationCard station={byName["Persiapan"]} isBottleneck={isBn("Persiapan")} />
         <StationCard station={byName["Packing Envelope"]} isBottleneck={isBn("Packing Envelope")} />

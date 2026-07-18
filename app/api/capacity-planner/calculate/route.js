@@ -67,16 +67,23 @@ function computeHoursForLineOptions(qty, capacityPerHour, attendanceFactor, maxL
 // Simulasi alur lengkap: dari 1 rate (pcs/jam) yang sama, hitung kebutuhan MP
 // di setiap station Supply + Gudang Jadi, cari station dengan buffer paling
 // kecil (bottleneck risk), dan estimasi total jam penyelesaian.
-function computeStationFlow(rate, avgCuttingCapacityPerHour, attendanceFactor, supplyRatios, gudangRatios, totalQty) {
+function computeStationFlow(rate, avgCuttingCapacityPerHour, attendanceFactor, supplyRatios, gudangRatios, totalQty, sewingInfo) {
   if (!rate || rate <= 0) return null;
 
+  const estimatedHours = totalQty > 0 ? totalQty / rate : null;
   const stations = [];
 
-  function addStation(name, exact) {
+  // hoursNeeded = jam kerja aktual yang dipakai station ini untuk menyelesaikan
+  // qty-nya, berdasarkan headcount yang sudah dibulatkan (rounded). Default-nya
+  // diturunkan dari estimatedHours (durasi total alur), tapi station yang punya
+  // basis qty/kapasitas sendiri (mis. Sewing) bisa kirim hoursNeeded eksplisit.
+  function addStation(name, exact, opts = {}) {
     if (!exact || exact <= 0) return;
     const rounded = Math.ceil(exact);
     const bufferPercent = ((rounded - exact) / exact) * 100;
-    stations.push({ name, exact, rounded, bufferPercent });
+    const hoursNeeded =
+      opts.hoursNeeded != null ? opts.hoursNeeded : estimatedHours != null ? estimatedHours * (exact / rounded) : null;
+    stations.push({ name, exact, rounded, bufferPercent, hoursNeeded, lines: opts.lines || null });
   }
 
   if (avgCuttingCapacityPerHour > 0) {
@@ -90,6 +97,29 @@ function computeStationFlow(rate, avgCuttingCapacityPerHour, attendanceFactor, s
     addStation("Distribusi", factor * supplyRatios.distribusi);
     addStation("Presub", factor * supplyRatios.presub);
   }
+
+  // Sewing Kanan/Kiri: qty & kapasitas per line beda basis dari station supply/gudang
+  // (yang berbasis rasio), jadi exact & hoursNeeded dihitung langsung dari qty/kapasitas
+  // line yang sudah ditugaskan (rounded), bukan dari estimatedHours alur utama.
+  if (sewingInfo?.qtyKananWomen > 0 && sewingInfo.capacityKananPerLine > 0) {
+    const exactKanan = sewingInfo.qtyKananWomen / sewingInfo.capacityKananPerLine;
+    const roundedKanan = Math.ceil(exactKanan);
+    const hoursNeededKanan =
+      sewingInfo.avgTargetKanan > 0
+        ? sewingInfo.qtyKananWomen / (roundedKanan * sewingInfo.avgTargetKanan * attendanceFactor)
+        : null;
+    addStation("Sewing Kanan", exactKanan, { lines: sewingInfo.suggestedLinesKananWomen, hoursNeeded: hoursNeededKanan });
+  }
+  if (sewingInfo?.qtyKiri > 0 && sewingInfo.capacityKiriPerLine > 0) {
+    const exactKiri = sewingInfo.qtyKiri / sewingInfo.capacityKiriPerLine;
+    const roundedKiri = Math.ceil(exactKiri);
+    const hoursNeededKiri =
+      sewingInfo.avgTargetKiri > 0
+        ? sewingInfo.qtyKiri / (roundedKiri * sewingInfo.avgTargetKiri * attendanceFactor)
+        : null;
+    addStation("Sewing Kiri", exactKiri, { lines: sewingInfo.suggestedLinesKiri, hoursNeeded: hoursNeededKiri });
+  }
+
   if (gudangRatios && gudangRatios.target > 0) {
     const factor = rate / gudangRatios.target;
     addStation("Persiapan", factor * gudangRatios.persiapan);
@@ -100,7 +130,6 @@ function computeStationFlow(rate, avgCuttingCapacityPerHour, attendanceFactor, s
   if (stations.length === 0) return null;
 
   const bottleneck = stations.reduce((min, s) => (s.bufferPercent < min.bufferPercent ? s : min), stations[0]);
-  const estimatedHours = totalQty > 0 ? totalQty / rate : null;
 
   return { rate, stations, bottleneck, estimatedHours };
 }
@@ -359,11 +388,20 @@ export async function POST(req) {
       };
     }
 
-    // Simulasi alur lengkap + deteksi bottleneck, rate = Total Qty / Total Jam.
-    const stationFlow = computeStationFlow(ratePerHour, cuttingCap.average, attendanceFactor, supplyRatios, gudangJadiRatios, totalQty);
-
     const suggestedLinesKananWomen = suggestLines("targetKanan", linesKananWomen);
     const suggestedLinesKiri = suggestLines("targetKiri", linesKiri);
+
+    // Simulasi alur lengkap + deteksi bottleneck, rate = Total Qty / Total Jam.
+    const stationFlow = computeStationFlow(ratePerHour, cuttingCap.average, attendanceFactor, supplyRatios, gudangJadiRatios, totalQty, {
+      qtyKananWomen,
+      capacityKananPerLine,
+      avgTargetKanan: refStyle?.avgTargetKanan,
+      suggestedLinesKananWomen,
+      qtyKiri: qi,
+      capacityKiriPerLine,
+      avgTargetKiri: refStyle?.avgTargetKiri,
+      suggestedLinesKiri,
+    });
 
     let suggestedOperators = [];
     if (skillCategory && operatorsNeeded) {
