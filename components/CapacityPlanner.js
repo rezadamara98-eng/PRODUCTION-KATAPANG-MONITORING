@@ -161,21 +161,21 @@ export default function CapacityPlanner() {
       {result && (
         <>
           <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 24 }}>
-            {result.qtyKanan > 0 && (
-              <div style={{ flex: "1 1 220px", background: "var(--panel)", border: "1px solid var(--steel)", borderLeft: "4px solid var(--navy)", padding: "18px 20px" }}>
+            {result.qtyKananWomen > 0 && (
+              <div style={{ flex: "1 1 260px", background: "var(--panel)", border: "1px solid var(--steel)", borderLeft: "4px solid var(--navy)", padding: "18px 20px" }}>
                 <p style={{ fontSize: 11, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 8px" }}>
-                  Line Kanan Dibutuhkan
+                  Line Kanan + Women Dibutuhkan
                 </p>
                 <p style={{ fontSize: 30, fontWeight: 700, color: "var(--navy)", margin: 0 }}>
-                  {result.linesKanan ?? "-"} <span style={{ fontSize: 14, color: "var(--text-muted)", fontWeight: 400 }}>line</span>
+                  {result.linesKananWomen ?? "-"} <span style={{ fontSize: 14, color: "var(--text-muted)", fontWeight: 400 }}>line</span>
                 </p>
                 <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "8px 0 0" }}>
-                  Qty {result.qtyKanan.toLocaleString("id-ID")} pcs, kapasitas {safeFixed(result.capacityKananPerLine, 0)} pcs/line
+                  Qty {result.qtyKananWomen.toLocaleString("id-ID")} pcs, kapasitas {safeFixed(result.capacityKananPerLine, 0)} pcs/line
                 </p>
               </div>
             )}
             {result.qtyKiri > 0 && (
-              <div style={{ flex: "1 1 220px", background: "var(--panel)", border: "1px solid var(--steel)", borderLeft: "4px solid var(--navy)", padding: "18px 20px" }}>
+              <div style={{ flex: "1 1 260px", background: "var(--panel)", border: "1px solid var(--steel)", borderLeft: "4px solid var(--navy)", padding: "18px 20px" }}>
                 <p style={{ fontSize: 11, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 8px" }}>
                   Line Kiri Dibutuhkan
                 </p>
@@ -187,20 +187,7 @@ export default function CapacityPlanner() {
                 </p>
               </div>
             )}
-            {result.qtyWomen > 0 && (
-              <div style={{ flex: "1 1 220px", background: "var(--panel)", border: "1px solid var(--steel)", borderLeft: "4px solid var(--navy)", padding: "18px 20px" }}>
-                <p style={{ fontSize: 11, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 8px" }}>
-                  Line Women Dibutuhkan
-                </p>
-                <p style={{ fontSize: 30, fontWeight: 700, color: "var(--navy)", margin: 0 }}>
-                  {result.linesWomen ?? "-"} <span style={{ fontSize: 14, color: "var(--text-muted)", fontWeight: 400 }}>line</span>
-                </p>
-                <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "8px 0 0" }}>
-                  Qty {result.qtyWomen.toLocaleString("id-ID")} pcs, kapasitas {safeFixed(result.capacityKananPerLine, 0)} pcs/line
-                </p>
-              </div>
-            )}
-            <div style={{ flex: "1 1 220px", background: "var(--panel)", border: "1px solid var(--steel)", borderLeft: "4px solid var(--teal)", padding: "18px 20px" }}>
+            <div style={{ flex: "1 1 260px", background: "var(--panel)", border: "1px solid var(--steel)", borderLeft: "4px solid var(--teal)", padding: "18px 20px" }}>
               <p style={{ fontSize: 11, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 8px" }}>
                 Operator Cutting Dibutuhkan
               </p>
@@ -208,25 +195,88 @@ export default function CapacityPlanner() {
                 {result.operatorsNeeded ?? "-"} <span style={{ fontSize: 14, color: "var(--text-muted)", fontWeight: 400 }}>orang</span>
               </p>
               <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "8px 0 0" }}>
-                Kategori: {result.skillCategory || "tidak terdeteksi"} &middot; {safeFixed(result.avgCuttingCapacityPerDay, 1)} pcs/operator/hari
+                Kategori: {result.skillCategory || "tidak terdeteksi"} &middot; {safeFixed(result.avgCuttingCapacityPerHour, 1)} pcs/operator/jam
               </p>
             </div>
           </div>
 
-          {(result.suggestedLinesKanan?.length > 0 ||
-            result.suggestedLinesKiri?.length > 0 ||
-            result.suggestedLinesWomen?.length > 0) && (
-            <Panel title="Line yang Disarankan" style={{ marginBottom: 24 }}>
+          {(result.simulationKananWomen?.length > 0 || result.simulationKiri?.length > 0) && (
+            <Panel title="Simulasi Opsi Jumlah Line" style={{ marginBottom: 24 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                {result.simulationKananWomen?.length > 0 && (
+                  <div>
+                    <p style={{ fontSize: 12, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 8px" }}>
+                      Kanan + Women (baseline {result.linesKananWomen} line)
+                    </p>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "var(--font-mono)", fontSize: 13 }}>
+                      <thead>
+                        <tr style={{ textAlign: "left", color: "var(--text-faint)" }}>
+                          <th style={{ padding: "6px 10px" }}>Jika Pakai</th>
+                          <th style={{ padding: "6px 10px", textAlign: "right" }}>Tambahan Jam/Hari</th>
+                          <th style={{ padding: "6px 10px", textAlign: "right" }}>Total Jam Tambahan</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {result.simulationKananWomen.map((s, i) => (
+                          <tr key={i} style={{ borderTop: "1px solid var(--steel)" }}>
+                            <td style={{ padding: "6px 10px" }}>{s.lines} line</td>
+                            <td style={{ padding: "6px 10px", textAlign: "right", color: s.additionalHoursPerDay > 0 ? "var(--red)" : "var(--green)" }}>
+                              +{safeFixed(s.additionalHoursPerDay, 1)} jam
+                            </td>
+                            <td style={{ padding: "6px 10px", textAlign: "right", color: "var(--text-muted)" }}>
+                              {safeFixed(s.additionalTotalHours, 1)} jam
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                {result.simulationKiri?.length > 0 && (
+                  <div>
+                    <p style={{ fontSize: 12, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 8px" }}>
+                      Kiri (baseline {result.linesKiri} line)
+                    </p>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "var(--font-mono)", fontSize: 13 }}>
+                      <thead>
+                        <tr style={{ textAlign: "left", color: "var(--text-faint)" }}>
+                          <th style={{ padding: "6px 10px" }}>Jika Pakai</th>
+                          <th style={{ padding: "6px 10px", textAlign: "right" }}>Tambahan Jam/Hari</th>
+                          <th style={{ padding: "6px 10px", textAlign: "right" }}>Total Jam Tambahan</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {result.simulationKiri.map((s, i) => (
+                          <tr key={i} style={{ borderTop: "1px solid var(--steel)" }}>
+                            <td style={{ padding: "6px 10px" }}>{s.lines} line</td>
+                            <td style={{ padding: "6px 10px", textAlign: "right", color: s.additionalHoursPerDay > 0 ? "var(--red)" : "var(--green)" }}>
+                              +{safeFixed(s.additionalHoursPerDay, 1)} jam
+                            </td>
+                            <td style={{ padding: "6px 10px", textAlign: "right", color: "var(--text-muted)" }}>
+                              {safeFixed(s.additionalTotalHours, 1)} jam
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </Panel>
+          )}
+
+          {(result.suggestedLinesKananWomen?.length > 0 || result.suggestedLinesKiri?.length > 0) && (
+            <Panel title="Line yang Disarankan (Baseline)" style={{ marginBottom: 24 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                {result.suggestedLinesKanan?.length > 0 && (
+                {result.suggestedLinesKananWomen?.length > 0 && (
                   <div>
                     <p style={{ fontSize: 12, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 6px" }}>
-                      Untuk Kanan
+                      Untuk Kanan + Women
                     </p>
                     <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                      {result.suggestedLinesKanan.map((l, i) => (
+                      {result.suggestedLinesKananWomen.map((l, i) => (
                         <div key={i} style={{ border: "1px solid var(--steel)", padding: "6px 12px", fontSize: 13, fontFamily: "var(--font-mono)" }}>
-                          <strong>{l.line}</strong> &middot; {l.capacity} pcs/hari &middot; eff {safeFixed(l.efficiency, 1)}%
+                          <strong>{l.line}</strong> &middot; {l.capacity} pcs/jam &middot; eff {safeFixed(l.efficiency, 1)}%
                         </div>
                       ))}
                     </div>
@@ -240,21 +290,7 @@ export default function CapacityPlanner() {
                     <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                       {result.suggestedLinesKiri.map((l, i) => (
                         <div key={i} style={{ border: "1px solid var(--steel)", padding: "6px 12px", fontSize: 13, fontFamily: "var(--font-mono)" }}>
-                          <strong>{l.line}</strong> &middot; {l.capacity} pcs/hari &middot; eff {safeFixed(l.efficiency, 1)}%
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {result.suggestedLinesWomen?.length > 0 && (
-                  <div>
-                    <p style={{ fontSize: 12, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 6px" }}>
-                      Untuk Women
-                    </p>
-                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                      {result.suggestedLinesWomen.map((l, i) => (
-                        <div key={i} style={{ border: "1px solid var(--steel)", padding: "6px 12px", fontSize: 13, fontFamily: "var(--font-mono)" }}>
-                          <strong>{l.line}</strong> &middot; {l.capacity} pcs/hari &middot; eff {safeFixed(l.efficiency, 1)}%
+                          <strong>{l.line}</strong> &middot; {l.capacity} pcs/jam &middot; eff {safeFixed(l.efficiency, 1)}%
                         </div>
                       ))}
                     </div>
@@ -270,7 +306,6 @@ export default function CapacityPlanner() {
                 <thead>
                   <tr style={{ textAlign: "left", color: "var(--text-faint)" }}>
                     <th style={{ padding: "6px 10px" }}>Nama</th>
-                    <th style={{ padding: "6px 10px" }}>Job</th>
                     <th style={{ padding: "6px 10px", textAlign: "right" }}>Kapasitas ({result.skillCategory})</th>
                   </tr>
                 </thead>
@@ -278,7 +313,6 @@ export default function CapacityPlanner() {
                   {result.suggestedOperators.map((o, i) => (
                     <tr key={i} style={{ borderTop: "1px solid var(--steel)" }}>
                       <td style={{ padding: "6px 10px" }}>{o.nama}</td>
-                      <td style={{ padding: "6px 10px", color: "var(--text-muted)" }}>{o.job}</td>
                       <td style={{ padding: "6px 10px", textAlign: "right" }}>{o.kapasitas}</td>
                     </tr>
                   ))}

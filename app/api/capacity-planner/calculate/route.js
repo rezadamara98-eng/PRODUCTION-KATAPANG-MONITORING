@@ -12,6 +12,25 @@ import { calculateWorkingCapacity } from "@/lib/dateUtils";
 
 export const dynamic = "force-dynamic";
 
+// Simulasi opsi jumlah line (1 sampai baseline-1), hitung tambahan jam kerja
+// yang dibutuhkan per hari supaya tetap selesai di deadline yang sama.
+function simulateLineOptions(qty, capacityPerHour, standardTotalHours, workingDays, baselineLines, attendanceFactor) {
+  if (!qty || !capacityPerHour || baselineLines <= 1) return [];
+
+  const options = [];
+  for (let L = 1; L < baselineLines; L++) {
+    const requiredTotalHoursPerLine = qty / (L * capacityPerHour * attendanceFactor);
+    const additionalTotalHours = Math.max(0, requiredTotalHoursPerLine - standardTotalHours);
+    const additionalHoursPerDay = workingDays > 0 ? additionalTotalHours / workingDays : 0;
+    options.push({
+      lines: L,
+      additionalHoursPerDay,
+      additionalTotalHours,
+    });
+  }
+  return options;
+}
+
 export async function POST(req) {
   try {
     const { style, qtyKanan, qtyKiri, qtyWomen, startDate, finishDate } = await req.json();
@@ -19,6 +38,7 @@ export async function POST(req) {
     const qk = Number(qtyKanan) || 0;
     const qi = Number(qtyKiri) || 0;
     const qw = Number(qtyWomen) || 0;
+    const qtyKananWomen = qk + qw;
     const totalQty = qk + qi + qw;
 
     if (!style || totalQty <= 0 || !startDate || !finishDate) {
@@ -53,32 +73,40 @@ export async function POST(req) {
       (s) => s.style.toLowerCase() === style.toLowerCase()
     ) || styleOptions.find((s) => s.style.toLowerCase().includes(style.toLowerCase()));
 
-    const { workingDays } = calculateWorkingCapacity(start, finish);
+    const { totalMinutes, workingDays } = calculateWorkingCapacity(start, finish);
+    const totalHours = totalMinutes / 60;
     const attendanceFactor = attendanceRate / 100;
 
-    // Kapasitas per line per hari diambil LANGSUNG dari Target Kanan (kolom F,
-    // dipakai juga untuk Women) dan Target Kiri (kolom G) di Strong Point Line -
-    // bukan dihitung dari PA PAF.
-    let linesKanan = null;
+    // Kapasitas per line per JAM diambil LANGSUNG dari Target Kanan (kolom F,
+    // dipakai juga untuk Women) dan Target Kiri (kolom G) di Strong Point Line.
+    // Kanan + Women digabung jadi satu kebutuhan line (sumber kapasitas sama),
+    // Kiri dihitung terpisah.
+    let linesKananWomen = null;
     let linesKiri = null;
-    let linesWomen = null;
-    let capacityKananPerLine = null;
-    let capacityKiriPerLine = null;
+    let capacityKananPerLine = null; // total kapasitas 1 line selama periode (Kanan/Women)
+    let capacityKiriPerLine = null; // total kapasitas 1 line selama periode (Kiri)
 
     if (refStyle) {
       if (refStyle.avgTargetKanan > 0) {
-        capacityKananPerLine = refStyle.avgTargetKanan * workingDays * attendanceFactor;
-        if (qk > 0) linesKanan = Math.ceil(qk / capacityKananPerLine);
-        if (qw > 0) linesWomen = Math.ceil(qw / capacityKananPerLine);
+        capacityKananPerLine = refStyle.avgTargetKanan * totalHours * attendanceFactor;
+        if (qtyKananWomen > 0) linesKananWomen = Math.ceil(qtyKananWomen / capacityKananPerLine);
       }
       if (refStyle.avgTargetKiri > 0) {
-        capacityKiriPerLine = refStyle.avgTargetKiri * workingDays * attendanceFactor;
+        capacityKiriPerLine = refStyle.avgTargetKiri * totalHours * attendanceFactor;
         if (qi > 0) linesKiri = Math.ceil(qi / capacityKiriPerLine);
       }
     }
 
-    // Kapasitas cutting: kapasitas rata-rata per operator per hari x jumlah hari kerja x faktor kehadiran.
-    const capacityPerOperator = cuttingCap.average * workingDays * attendanceFactor;
+    const simulationKananWomen = refStyle
+      ? simulateLineOptions(qtyKananWomen, refStyle.avgTargetKanan, totalHours, workingDays, linesKananWomen, attendanceFactor)
+      : [];
+    const simulationKiri = refStyle
+      ? simulateLineOptions(qi, refStyle.avgTargetKiri, totalHours, workingDays, linesKiri, attendanceFactor)
+      : [];
+
+    // Kapasitas cutting: skor Skill Matrik = kapasitas per JAM, jadi dikali total jam
+    // kerja efektif (bukan jumlah hari) x faktor kehadiran.
+    const capacityPerOperator = cuttingCap.average * totalHours * attendanceFactor;
     const operatorsNeeded = capacityPerOperator > 0 ? Math.ceil(totalQty / capacityPerOperator) : null;
 
     // Cari daftar line asli untuk style referensi, urutkan dari kapasitas terbesar,
@@ -97,9 +125,8 @@ export async function POST(req) {
         .map((l) => ({ line: l.line, capacity: l[sortField], efficiency: sortField === "targetKanan" ? l.effKanan : l.effKiri }));
     }
 
-    const suggestedLinesKanan = suggestLines("targetKanan", linesKanan);
+    const suggestedLinesKananWomen = suggestLines("targetKanan", linesKananWomen);
     const suggestedLinesKiri = suggestLines("targetKiri", linesKiri);
-    const suggestedLinesWomen = suggestLines("targetKanan", linesWomen);
 
     // Sarankan operator cutting spesifik: skor tertinggi di kategori yang cocok.
     let suggestedOperators = [];
@@ -162,22 +189,24 @@ export async function POST(req) {
       qtyKanan: qk,
       qtyKiri: qi,
       qtyWomen: qw,
+      qtyKananWomen,
       totalQty,
       workingDays,
+      totalHours,
       attendanceRate,
       refStyle,
-      linesKanan,
+      linesKananWomen,
       linesKiri,
-      linesWomen,
-      suggestedLinesKanan,
+      suggestedLinesKananWomen,
       suggestedLinesKiri,
-      suggestedLinesWomen,
+      simulationKananWomen,
+      simulationKiri,
       capacityKananPerLine,
       capacityKiriPerLine,
       operatorsNeeded,
       suggestedOperators,
       skillCategory,
-      avgCuttingCapacityPerDay: cuttingCap.average,
+      avgCuttingCapacityPerHour: cuttingCap.average,
       considerations,
     });
   } catch (err) {
