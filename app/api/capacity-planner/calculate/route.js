@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import {
   getStrongPointStyleOptions,
   getStrongPointData,
-  getAverageAttendanceRate,
   getKodeOperatorCuttingList,
   getSkillCategoryForStyle,
   getAverageSkillCuttingCapacity,
@@ -17,12 +16,12 @@ export const dynamic = "force-dynamic";
 
 // Simulasi opsi jumlah line (1 sampai baseline-1), hitung tambahan jam kerja
 // yang dibutuhkan per hari supaya tetap selesai di deadline yang sama.
-function simulateLineOptionsWithDeadline(qty, capacityPerHour, standardTotalHours, workingDays, baselineLines, attendanceFactor) {
+function simulateLineOptionsWithDeadline(qty, capacityPerHour, standardTotalHours, workingDays, baselineLines) {
   if (!qty || !capacityPerHour || baselineLines <= 1) return [];
 
   const options = [];
   for (let L = 1; L < baselineLines; L++) {
-    const requiredTotalHoursPerLine = qty / (L * capacityPerHour * attendanceFactor);
+    const requiredTotalHoursPerLine = qty / (L * capacityPerHour);
     const additionalTotalHours = Math.max(0, requiredTotalHoursPerLine - standardTotalHours);
     const additionalHoursPerDay = workingDays > 0 ? additionalTotalHours / workingDays : 0;
     options.push({ lines: L, additionalHoursPerDay, additionalTotalHours });
@@ -32,7 +31,7 @@ function simulateLineOptionsWithDeadline(qty, capacityPerHour, standardTotalHour
 
 // Mode tanpa deadline: opsi jumlah OPERATOR cutting, pakai kapasitas aktual
 // operator terbaik (bukan rata-rata), supaya urutannya benar dari yang paling capable.
-function computeHoursForOperatorOptions(qty, sortedOperators, attendanceFactor, maxOptions) {
+function computeHoursForOperatorOptions(qty, sortedOperators, maxOptions) {
   if (!qty || sortedOperators.length === 0) return [];
 
   const cap = Math.min(maxOptions, sortedOperators.length);
@@ -41,7 +40,7 @@ function computeHoursForOperatorOptions(qty, sortedOperators, attendanceFactor, 
 
   for (let L = 1; L <= cap; L++) {
     cumulativeCapacity += sortedOperators[L - 1].kapasitas;
-    const totalHoursNeeded = qty / (cumulativeCapacity * attendanceFactor);
+    const totalHoursNeeded = qty / cumulativeCapacity;
     options.push({
       operators: L,
       totalHoursNeeded,
@@ -53,12 +52,12 @@ function computeHoursForOperatorOptions(qty, sortedOperators, attendanceFactor, 
 
 // Mode tanpa deadline: langsung hitung total jam dibutuhkan untuk tiap opsi
 // jumlah line (1 sampai maksimal line yang tersedia historis untuk style itu).
-function computeHoursForLineOptions(qty, capacityPerHour, attendanceFactor, maxLines) {
+function computeHoursForLineOptions(qty, capacityPerHour, maxLines) {
   if (!qty || !capacityPerHour || !maxLines || maxLines <= 0) return [];
 
   const options = [];
   for (let L = 1; L <= maxLines; L++) {
-    const totalHoursNeeded = qty / (L * capacityPerHour * attendanceFactor);
+    const totalHoursNeeded = qty / (L * capacityPerHour);
     options.push({ lines: L, totalHoursNeeded });
   }
   return options;
@@ -67,7 +66,7 @@ function computeHoursForLineOptions(qty, capacityPerHour, attendanceFactor, maxL
 // Simulasi alur lengkap: dari 1 rate (pcs/jam) yang sama, hitung kebutuhan MP
 // di setiap station Supply + Gudang Jadi, cari station dengan buffer paling
 // kecil (bottleneck risk), dan estimasi total jam penyelesaian.
-function computeStationFlow(rate, avgCuttingCapacityPerHour, attendanceFactor, supplyRatios, gudangRatios, totalQty, sewingInfo) {
+function computeStationFlow(rate, avgCuttingCapacityPerHour, supplyRatios, gudangRatios, totalQty, sewingInfo) {
   if (!rate || rate <= 0) return null;
 
   const estimatedHours = totalQty > 0 ? totalQty / rate : null;
@@ -87,7 +86,7 @@ function computeStationFlow(rate, avgCuttingCapacityPerHour, attendanceFactor, s
   }
 
   if (avgCuttingCapacityPerHour > 0) {
-    addStation("Cutting Kulit", rate / (avgCuttingCapacityPerHour * attendanceFactor));
+    addStation("Cutting Kulit", rate / avgCuttingCapacityPerHour);
   }
   if (supplyRatios && supplyRatios.target > 0) {
     const factor = rate / supplyRatios.target;
@@ -106,7 +105,7 @@ function computeStationFlow(rate, avgCuttingCapacityPerHour, attendanceFactor, s
     const roundedKanan = Math.ceil(exactKanan);
     const hoursNeededKanan =
       sewingInfo.avgTargetKanan > 0
-        ? sewingInfo.qtyKananWomen / (roundedKanan * sewingInfo.avgTargetKanan * attendanceFactor)
+        ? sewingInfo.qtyKananWomen / (roundedKanan * sewingInfo.avgTargetKanan)
         : null;
     addStation("Sewing Kanan", exactKanan, { lines: sewingInfo.suggestedLinesKananWomen, hoursNeeded: hoursNeededKanan });
   }
@@ -115,7 +114,7 @@ function computeStationFlow(rate, avgCuttingCapacityPerHour, attendanceFactor, s
     const roundedKiri = Math.ceil(exactKiri);
     const hoursNeededKiri =
       sewingInfo.avgTargetKiri > 0
-        ? sewingInfo.qtyKiri / (roundedKiri * sewingInfo.avgTargetKiri * attendanceFactor)
+        ? sewingInfo.qtyKiri / (roundedKiri * sewingInfo.avgTargetKiri)
         : null;
     addStation("Sewing Kiri", exactKiri, { lines: sewingInfo.suggestedLinesKiri, hoursNeeded: hoursNeededKiri });
   }
@@ -168,11 +167,10 @@ export async function POST(req) {
 
     const skillCategory = getSkillCategoryForStyle(style);
 
-    const [styleOptions, cuttingCap, attendanceRate, operatorList, strongPointGroups, skillMatrikRows, supplyRatios, gudangJadiRatios] =
+    const [styleOptions, cuttingCap, operatorList, strongPointGroups, skillMatrikRows, supplyRatios, gudangJadiRatios] =
       await Promise.all([
         getStrongPointStyleOptions(),
         getAverageSkillCuttingCapacity(skillCategory),
-        getAverageAttendanceRate(),
         getKodeOperatorCuttingList(),
         getStrongPointData(),
         getSkillMatrikCuttingData(),
@@ -183,8 +181,6 @@ export async function POST(req) {
     const refStyle = styleOptions.find(
       (s) => s.style.toLowerCase() === style.toLowerCase()
     ) || styleOptions.find((s) => s.style.toLowerCase().includes(style.toLowerCase()));
-
-    const attendanceFactor = attendanceRate / 100;
 
     const matchingGroup = refStyle
       ? strongPointGroups.find((g) => g.style.toLowerCase() === refStyle.style.toLowerCase())
@@ -240,11 +236,6 @@ export async function POST(req) {
       });
     }
 
-    considerations.push({
-      type: "ok",
-      text: `Perhitungan sudah menyertakan estimasi tingkat kehadiran rata-rata ${attendanceRate.toFixed(1)}% dari data historis.`,
-    });
-
     if (!skillCategory) {
       considerations.push({
         type: "warning",
@@ -273,13 +264,13 @@ export async function POST(req) {
       const maxLinesKiri = groupLines.filter((l) => l.targetKiri > 0).length;
 
       const optionsKananWomen = refStyle
-        ? computeHoursForLineOptions(qtyKananWomen, refStyle.avgTargetKanan, attendanceFactor, maxLinesKananWomen).map((o) => ({
+        ? computeHoursForLineOptions(qtyKananWomen, refStyle.avgTargetKanan, maxLinesKananWomen).map((o) => ({
             ...o,
             suggestedLines: suggestLines("targetKanan", o.lines),
           }))
         : [];
       const optionsKiri = refStyle
-        ? computeHoursForLineOptions(qi, refStyle.avgTargetKiri, attendanceFactor, maxLinesKiri).map((o) => ({
+        ? computeHoursForLineOptions(qi, refStyle.avgTargetKiri, maxLinesKiri).map((o) => ({
             ...o,
             suggestedLines: suggestLines("targetKiri", o.lines),
           }))
@@ -291,13 +282,13 @@ export async function POST(req) {
           .filter((r) => r[skillCategory] > 0)
           .sort((a, b) => b[skillCategory] - a[skillCategory])
           .map((r) => ({ nama: r.nama, kapasitas: r[skillCategory] }));
-        optionsOperators = computeHoursForOperatorOptions(totalQty, sortedOperators, attendanceFactor, 10);
+        optionsOperators = computeHoursForOperatorOptions(totalQty, sortedOperators, 10);
       }
 
       // Tidak ada tanggal -> rate dasar dipakai kapasitas 1 line rata-rata (Kanan) dari style referensi.
       const baselineRate = refStyle?.avgTargetKanan || null;
       const stationFlow = baselineRate
-        ? computeStationFlow(baselineRate, cuttingCap.average, attendanceFactor, supplyRatios, gudangJadiRatios, totalQty)
+        ? computeStationFlow(baselineRate, cuttingCap.average, supplyRatios, gudangJadiRatios, totalQty)
         : null;
 
       considerations.push({
@@ -314,7 +305,6 @@ export async function POST(req) {
         qtyWomen: qw,
         qtyKananWomen,
         totalQty,
-        attendanceRate,
         refStyle,
         skillCategory,
         avgCuttingCapacityPerHour: cuttingCap.average,
@@ -341,23 +331,23 @@ export async function POST(req) {
 
     if (refStyle) {
       if (refStyle.avgTargetKanan > 0) {
-        capacityKananPerLine = refStyle.avgTargetKanan * totalHours * attendanceFactor;
+        capacityKananPerLine = refStyle.avgTargetKanan * totalHours;
         if (qtyKananWomen > 0) linesKananWomen = Math.ceil(qtyKananWomen / capacityKananPerLine);
       }
       if (refStyle.avgTargetKiri > 0) {
-        capacityKiriPerLine = refStyle.avgTargetKiri * totalHours * attendanceFactor;
+        capacityKiriPerLine = refStyle.avgTargetKiri * totalHours;
         if (qi > 0) linesKiri = Math.ceil(qi / capacityKiriPerLine);
       }
     }
 
     const simulationKananWomen = refStyle
-      ? simulateLineOptionsWithDeadline(qtyKananWomen, refStyle.avgTargetKanan, totalHours, workingDays, linesKananWomen, attendanceFactor)
+      ? simulateLineOptionsWithDeadline(qtyKananWomen, refStyle.avgTargetKanan, totalHours, workingDays, linesKananWomen)
       : [];
     const simulationKiri = refStyle
-      ? simulateLineOptionsWithDeadline(qi, refStyle.avgTargetKiri, totalHours, workingDays, linesKiri, attendanceFactor)
+      ? simulateLineOptionsWithDeadline(qi, refStyle.avgTargetKiri, totalHours, workingDays, linesKiri)
       : [];
 
-    const capacityPerOperator = cuttingCap.average * totalHours * attendanceFactor;
+    const capacityPerOperator = cuttingCap.average * totalHours;
     const operatorsNeeded = capacityPerOperator > 0 ? Math.ceil(totalQty / capacityPerOperator) : null;
 
     const ratePerHour = totalQty / totalHours;
@@ -392,7 +382,7 @@ export async function POST(req) {
     const suggestedLinesKiri = suggestLines("targetKiri", linesKiri);
 
     // Simulasi alur lengkap + deteksi bottleneck, rate = Total Qty / Total Jam.
-    const stationFlow = computeStationFlow(ratePerHour, cuttingCap.average, attendanceFactor, supplyRatios, gudangJadiRatios, totalQty, {
+    const stationFlow = computeStationFlow(ratePerHour, cuttingCap.average, supplyRatios, gudangJadiRatios, totalQty, {
       qtyKananWomen,
       capacityKananPerLine,
       avgTargetKanan: refStyle?.avgTargetKanan,
@@ -435,7 +425,6 @@ export async function POST(req) {
       totalQty,
       workingDays,
       totalHours,
-      attendanceRate,
       refStyle,
       linesKananWomen,
       linesKiri,
