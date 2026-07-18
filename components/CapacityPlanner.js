@@ -8,18 +8,13 @@ function safeFixed(val, digits = 1) {
   return Number.isFinite(n) ? n.toFixed(digits) : "-";
 }
 
-function todayStr() {
-  const d = new Date();
-  return d.toISOString().slice(0, 10);
-}
-
 export default function CapacityPlanner() {
   const [styleOptions, setStyleOptions] = useState([]);
   const [style, setStyle] = useState("");
   const [qtyKanan, setQtyKanan] = useState("");
   const [qtyKiri, setQtyKiri] = useState("");
   const [qtyWomen, setQtyWomen] = useState("");
-  const [startDate, setStartDate] = useState(todayStr());
+  const [startDate, setStartDate] = useState("");
   const [finishDate, setFinishDate] = useState("");
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
