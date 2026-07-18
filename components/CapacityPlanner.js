@@ -41,6 +41,74 @@ function MpCard({ label, value, unit, note, accent = "var(--teal)" }) {
   );
 }
 
+function StationCard({ station, isBottleneck }) {
+  if (!station) return null;
+  return (
+    <div
+      style={{
+        background: "var(--panel)",
+        border: isBottleneck ? "1px solid var(--red)" : "1px solid var(--steel)",
+        borderTop: isBottleneck ? "3px solid var(--red)" : "3px solid var(--teal)",
+        padding: "10px 12px",
+        minWidth: 130,
+      }}
+    >
+      <p style={{ fontSize: 10, color: "var(--text-faint)", textTransform: "uppercase", margin: "0 0 4px" }}>{station.name}</p>
+      <p style={{ fontSize: 20, fontWeight: 700, color: "var(--navy)", margin: 0 }}>{station.rounded} <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 400 }}>org</span></p>
+      <p style={{ fontSize: 11, color: isBottleneck ? "var(--red)" : "var(--text-muted)", margin: "4px 0 0" }}>
+        {isBottleneck ? "\u26A0 " : ""}buffer {safeFixed(station.bufferPercent, 1)}%
+      </p>
+    </div>
+  );
+}
+
+function StationFlowDiagram({ stationFlow }) {
+  if (!stationFlow) return null;
+  const byName = Object.fromEntries(stationFlow.stations.map((s) => [s.name, s]));
+  const isBn = (name) => stationFlow.bottleneck?.name === name;
+  const arrowStyle = { textAlign: "center", color: "var(--text-faint)", fontSize: 18, margin: "6px 0" };
+
+  return (
+    <Panel title="Simulasi Alur Proses & Bottleneck" style={{ marginBottom: 24 }}>
+      <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 0, marginBottom: 14 }}>
+        Rate dasar simulasi: <strong>{safeFixed(stationFlow.rate, 0)} pcs/jam</strong>
+        {stationFlow.estimatedHours != null && (
+          <>
+            {" "}&middot; Estimasi waktu selesai: <strong>{safeFixed(stationFlow.estimatedHours, 1)} jam</strong>
+          </>
+        )}
+      </p>
+
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center", marginBottom: 4 }}>
+        <StationCard station={byName["Cutting Kulit"]} isBottleneck={isBn("Cutting Kulit")} />
+        <StationCard station={byName["Cutting Synthetic"]} isBottleneck={isBn("Cutting Synthetic")} />
+        <StationCard station={byName["Accessories"]} isBottleneck={isBn("Accessories")} />
+        <StationCard station={byName["M4"]} isBottleneck={isBn("M4")} />
+      </div>
+      <div style={arrowStyle}>&#8595; menyatu di</div>
+      <div style={{ display: "flex", justifyContent: "center", marginBottom: 4 }}>
+        <StationCard station={byName["Distribusi"]} isBottleneck={isBn("Distribusi")} />
+      </div>
+      <div style={arrowStyle}>&#8595;</div>
+      <div style={{ display: "flex", justifyContent: "center", marginBottom: 4 }}>
+        <StationCard station={byName["Presub"]} isBottleneck={isBn("Presub")} />
+      </div>
+      <div style={arrowStyle}>&#8595; lanjut sewing (assembly), lalu ke gudang jadi</div>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
+        <StationCard station={byName["Persiapan"]} isBottleneck={isBn("Persiapan")} />
+        <StationCard station={byName["Packing Envelope"]} isBottleneck={isBn("Packing Envelope")} />
+        <StationCard station={byName["Packing Inner Carton"]} isBottleneck={isBn("Packing Inner Carton")} />
+      </div>
+
+      {stationFlow.bottleneck && (
+        <p style={{ fontSize: 12, color: "var(--red)", marginTop: 14, marginBottom: 0 }}>
+          &#9888; Station paling berisiko jadi bottleneck: <strong>{stationFlow.bottleneck.name}</strong> (buffer cuma {safeFixed(stationFlow.bottleneck.bufferPercent, 1)}%)
+        </p>
+      )}
+    </Panel>
+  );
+}
+
 function CriticalPointsSection({ points }) {
   if (!points) return null;
   const { cutting = [], produksi = [] } = points;
@@ -327,6 +395,8 @@ export default function CapacityPlanner() {
             </Panel>
           )}
 
+          <StationFlowDiagram stationFlow={result.stationFlow} />
+
           <CriticalPointsSection points={result.criticalPoints} />
 
           <Panel title="Aspek yang Perlu Diperhatikan">
@@ -534,6 +604,8 @@ export default function CapacityPlanner() {
               </table>
             </Panel>
           )}
+
+          <StationFlowDiagram stationFlow={result.stationFlow} />
 
           <CriticalPointsSection points={result.criticalPoints} />
 

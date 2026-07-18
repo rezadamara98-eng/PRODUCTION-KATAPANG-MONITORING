@@ -64,6 +64,47 @@ function computeHoursForLineOptions(qty, capacityPerHour, attendanceFactor, maxL
   return options;
 }
 
+// Simulasi alur lengkap: dari 1 rate (pcs/jam) yang sama, hitung kebutuhan MP
+// di setiap station Supply + Gudang Jadi, cari station dengan buffer paling
+// kecil (bottleneck risk), dan estimasi total jam penyelesaian.
+function computeStationFlow(rate, avgCuttingCapacityPerHour, attendanceFactor, supplyRatios, gudangRatios, totalQty) {
+  if (!rate || rate <= 0) return null;
+
+  const stations = [];
+
+  function addStation(name, exact) {
+    if (!exact || exact <= 0) return;
+    const rounded = Math.ceil(exact);
+    const bufferPercent = ((rounded - exact) / exact) * 100;
+    stations.push({ name, exact, rounded, bufferPercent });
+  }
+
+  if (avgCuttingCapacityPerHour > 0) {
+    addStation("Cutting Kulit", rate / (avgCuttingCapacityPerHour * attendanceFactor));
+  }
+  if (supplyRatios && supplyRatios.target > 0) {
+    const factor = rate / supplyRatios.target;
+    addStation("Cutting Synthetic", factor * supplyRatios.cuttingSynthetic);
+    addStation("Accessories", factor * supplyRatios.accessories);
+    addStation("M4", factor * supplyRatios.m4);
+    addStation("Distribusi", factor * supplyRatios.distribusi);
+    addStation("Presub", factor * supplyRatios.presub);
+  }
+  if (gudangRatios && gudangRatios.target > 0) {
+    const factor = rate / gudangRatios.target;
+    addStation("Persiapan", factor * gudangRatios.persiapan);
+    addStation("Packing Envelope", factor * gudangRatios.packingEnvelope);
+    addStation("Packing Inner Carton", factor * gudangRatios.packingInnerCarton);
+  }
+
+  if (stations.length === 0) return null;
+
+  const bottleneck = stations.reduce((min, s) => (s.bufferPercent < min.bufferPercent ? s : min), stations[0]);
+  const estimatedHours = totalQty > 0 ? totalQty / rate : null;
+
+  return { rate, stations, bottleneck, estimatedHours };
+}
+
 export async function POST(req) {
   try {
     const { style, qtyKanan, qtyKiri, qtyWomen, startDate, finishDate } = await req.json();
@@ -98,14 +139,17 @@ export async function POST(req) {
 
     const skillCategory = getSkillCategoryForStyle(style);
 
-    const [styleOptions, cuttingCap, attendanceRate, operatorList, strongPointGroups, skillMatrikRows] = await Promise.all([
-      getStrongPointStyleOptions(),
-      getAverageSkillCuttingCapacity(skillCategory),
-      getAverageAttendanceRate(),
-      getKodeOperatorCuttingList(),
-      getStrongPointData(),
-      getSkillMatrikCuttingData(),
-    ]);
+    const [styleOptions, cuttingCap, attendanceRate, operatorList, strongPointGroups, skillMatrikRows, supplyRatios, gudangJadiRatios] =
+      await Promise.all([
+        getStrongPointStyleOptions(),
+        getAverageSkillCuttingCapacity(skillCategory),
+        getAverageAttendanceRate(),
+        getKodeOperatorCuttingList(),
+        getStrongPointData(),
+        getSkillMatrikCuttingData(),
+        getSupplyMpRatios(style),
+        getGudangJadiMpRatios(style),
+      ]);
 
     const refStyle = styleOptions.find(
       (s) => s.style.toLowerCase() === style.toLowerCase()
@@ -142,10 +186,8 @@ export async function POST(req) {
 
     const considerations = [];
 
-    // Poin kritis (cutting & produksi) khusus untuk style ini.
     const criticalPoints = await getCriticalPointsForStyle(style);
 
-    // Rentang kapasitas operator di kategori skill ini (tertinggi/terendah).
     let operatorCapacityRange = null;
     if (skillCategory) {
       const capsInCategory = skillMatrikRows.map((r) => r[skillCategory]).filter((v) => v > 0);
@@ -214,11 +256,6 @@ export async function POST(req) {
           }))
         : [];
 
-      considerations.push({
-        type: "info",
-        text: "Tidak ada tanggal target, jadi hasil di bawah adalah total jam kerja dibutuhkan untuk tiap opsi jumlah line, tanpa batas waktu.",
-      });
-
       let optionsOperators = [];
       if (skillCategory) {
         const sortedOperators = [...skillMatrikRows]
@@ -227,6 +264,19 @@ export async function POST(req) {
           .map((r) => ({ nama: r.nama, kapasitas: r[skillCategory] }));
         optionsOperators = computeHoursForOperatorOptions(totalQty, sortedOperators, attendanceFactor, 10);
       }
+
+      // Tidak ada tanggal -> rate dasar dipakai kapasitas 1 line rata-rata (Kanan) dari style referensi.
+      const baselineRate = refStyle?.avgTargetKanan || null;
+      const stationFlow = baselineRate
+        ? computeStationFlow(baselineRate, cuttingCap.average, attendanceFactor, supplyRatios, gudangJadiRatios, totalQty)
+        : null;
+
+      considerations.push({
+        type: "info",
+        text: baselineRate
+          ? `Tidak ada tanggal target, simulasi station di bawah pakai asumsi rate ${baselineRate.toFixed(0)} pcs/jam (kapasitas 1 line rata-rata untuk style ini).`
+          : "Tidak ada tanggal target dan tidak ada data referensi kapasitas line, simulasi station tidak bisa ditampilkan.",
+      });
 
       return NextResponse.json({
         mode: "no-deadline",
@@ -246,11 +296,12 @@ export async function POST(req) {
         optionsKananWomen,
         optionsKiri,
         optionsOperators,
+        stationFlow,
         considerations,
       });
     }
 
-    // ===== MODE DENGAN DEADLINE (seperti sebelumnya) =====
+    // ===== MODE DENGAN DEADLINE =====
     const { totalMinutes, workingDays } = calculateWorkingCapacity(start, finish);
     const totalHours = totalMinutes / 60;
 
@@ -280,12 +331,11 @@ export async function POST(req) {
     const capacityPerOperator = cuttingCap.average * totalHours * attendanceFactor;
     const operatorsNeeded = capacityPerOperator > 0 ? Math.ceil(totalQty / capacityPerOperator) : null;
 
-    // MP Gudang Jadi: rate keseluruhan (pcs/jam) dari Total Qty / Total Jam,
-    // diskalakan proporsional terhadap rasio standar (per Target pcs/jam).
-    const gudangJadiRatios = await getGudangJadiMpRatios(style);
+    const ratePerHour = totalQty / totalHours;
+
+    // MP Gudang Jadi (dipertahankan untuk kompatibilitas kartu yang sudah ada).
     let gudangJadiMp = null;
-    if (gudangJadiRatios && gudangJadiRatios.target > 0 && totalHours > 0) {
-      const ratePerHour = totalQty / totalHours;
+    if (gudangJadiRatios && gudangJadiRatios.target > 0) {
       const factor = ratePerHour / gudangJadiRatios.target;
       gudangJadiMp = {
         ratePerHour,
@@ -295,12 +345,9 @@ export async function POST(req) {
       };
     }
 
-    // MP Supply: rate sama dengan Gudang Jadi (Total Qty / Total Jam),
-    // diskalakan proporsional terhadap rasio standar di KEBUTUHAN MP SUPPLY.
-    const supplyRatios = await getSupplyMpRatios(style);
+    // MP Supply (dipertahankan untuk kompatibilitas kartu yang sudah ada).
     let supplyMp = null;
-    if (supplyRatios && supplyRatios.target > 0 && totalHours > 0) {
-      const ratePerHour = totalQty / totalHours;
+    if (supplyRatios && supplyRatios.target > 0) {
       const factor = ratePerHour / supplyRatios.target;
       supplyMp = {
         ratePerHour,
@@ -311,6 +358,9 @@ export async function POST(req) {
         presub: Math.ceil(factor * supplyRatios.presub),
       };
     }
+
+    // Simulasi alur lengkap + deteksi bottleneck, rate = Total Qty / Total Jam.
+    const stationFlow = computeStationFlow(ratePerHour, cuttingCap.average, attendanceFactor, supplyRatios, gudangJadiRatios, totalQty);
 
     const suggestedLinesKananWomen = suggestLines("targetKanan", linesKananWomen);
     const suggestedLinesKiri = suggestLines("targetKiri", linesKiri);
@@ -328,6 +378,13 @@ export async function POST(req) {
       considerations.push({
         type: "warning",
         text: `Kebutuhan ${operatorsNeeded} operator melebihi total ${operatorList.length} operator cutting yang terdaftar di sistem.`,
+      });
+    }
+
+    if (stationFlow?.bottleneck) {
+      considerations.push({
+        type: stationFlow.bottleneck.bufferPercent < 10 ? "warning" : "ok",
+        text: `Station dengan buffer kapasitas paling kecil: ${stationFlow.bottleneck.name} (${stationFlow.bottleneck.bufferPercent.toFixed(1)}% buffer). Ini yang paling berisiko jadi bottleneck kalau ada gangguan.`,
       });
     }
 
@@ -359,6 +416,7 @@ export async function POST(req) {
       lineCapacityRangeKiri,
       gudangJadiMp,
       supplyMp,
+      stationFlow,
       criticalPoints,
       considerations,
     });
