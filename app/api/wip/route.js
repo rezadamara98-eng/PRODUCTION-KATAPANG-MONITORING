@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { getWipSummary, getWipLineData } from "@/lib/sheets";
+import { getWipRawBundle } from "@/lib/sheets";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const [summary, lineData] = await Promise.all([getWipSummary(), getWipLineData()]);
+    const { summary, lineData } = await getWipRawBundle();
     return NextResponse.json({ summary, lineData, fetchedAt: new Date().toISOString() });
   } catch (err) {
     console.error("Gagal mengambil data WIP:", err);

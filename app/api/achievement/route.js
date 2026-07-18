@@ -1,16 +1,12 @@
 import { NextResponse } from "next/server";
-import { getPlanSewData, getPlanDistData, getGudangJadiData, getGudangJadiSummary } from "@/lib/sheets";
+import { getAchievementRawBundle } from "@/lib/sheets";
 import { getLastCompleteGroupRows } from "@/lib/dateUtils";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const [planSewRows, planDistRows, gudangSummary] = await Promise.all([
-      getPlanSewData(),
-      getPlanDistData(),
-      getGudangJadiSummary(),
-    ]);
+    const { planSewRows, planDistRows, gudangSummary } = await getAchievementRawBundle();
 
     const sewYesterday = getLastCompleteGroupRows(planSewRows, "tanggal", "achievement");
     const validSew = sewYesterday.filter((r) => Number.isFinite(r.achievement) && r.achievement > 0);

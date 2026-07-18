@@ -1,23 +1,11 @@
 import { NextResponse } from "next/server";
-import {
-  getJamKerjaYesterday,
-  getAbsensiYesterday,
-  getKapasitasCuttingTop10,
-  getSkillMatrikCuttingTop10,
-  getStrongPointData,
-} from "@/lib/sheets";
+import { getManpowerRawBundle } from "@/lib/sheets";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const [jamKerja, absensi, kapasitasCutting, skillMatrik, strongPoint] = await Promise.all([
-      getJamKerjaYesterday(),
-      getAbsensiYesterday(),
-      getKapasitasCuttingTop10(),
-      getSkillMatrikCuttingTop10(),
-      getStrongPointData(),
-    ]);
+    const { jamKerja, absensi, kapasitasCutting, skillMatrik, strongPoint } = await getManpowerRawBundle();
 
     return NextResponse.json({
       jamKerja,
