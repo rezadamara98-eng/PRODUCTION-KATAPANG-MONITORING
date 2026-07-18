@@ -27,6 +27,27 @@ function simulateLineOptionsWithDeadline(qty, capacityPerHour, standardTotalHour
   return options;
 }
 
+// Mode tanpa deadline: opsi jumlah OPERATOR cutting, pakai kapasitas aktual
+// operator terbaik (bukan rata-rata), supaya urutannya benar dari yang paling capable.
+function computeHoursForOperatorOptions(qty, sortedOperators, attendanceFactor, maxOptions) {
+  if (!qty || sortedOperators.length === 0) return [];
+
+  const cap = Math.min(maxOptions, sortedOperators.length);
+  const options = [];
+  let cumulativeCapacity = 0;
+
+  for (let L = 1; L <= cap; L++) {
+    cumulativeCapacity += sortedOperators[L - 1].kapasitas;
+    const totalHoursNeeded = qty / (cumulativeCapacity * attendanceFactor);
+    options.push({
+      operators: L,
+      totalHoursNeeded,
+      suggestedOperators: sortedOperators.slice(0, L),
+    });
+  }
+  return options;
+}
+
 // Mode tanpa deadline: langsung hitung total jam dibutuhkan untuk tiap opsi
 // jumlah line (1 sampai maksimal line yang tersedia historis untuk style itu).
 function computeHoursForLineOptions(qty, capacityPerHour, attendanceFactor, maxLines) {
@@ -166,6 +187,15 @@ export async function POST(req) {
         text: "Tidak ada tanggal target, jadi hasil di bawah adalah total jam kerja dibutuhkan untuk tiap opsi jumlah line, tanpa batas waktu.",
       });
 
+      let optionsOperators = [];
+      if (skillCategory) {
+        const sortedOperators = [...skillMatrikRows]
+          .filter((r) => r[skillCategory] > 0)
+          .sort((a, b) => b[skillCategory] - a[skillCategory])
+          .map((r) => ({ nama: r.nama, kapasitas: r[skillCategory] }));
+        optionsOperators = computeHoursForOperatorOptions(totalQty, sortedOperators, attendanceFactor, 10);
+      }
+
       return NextResponse.json({
         mode: "no-deadline",
         qtyKanan: qk,
@@ -179,6 +209,7 @@ export async function POST(req) {
         avgCuttingCapacityPerHour: cuttingCap.average,
         optionsKananWomen,
         optionsKiri,
+        optionsOperators,
         considerations,
       });
     }

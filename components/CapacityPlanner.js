@@ -219,6 +219,34 @@ export default function CapacityPlanner() {
             </Panel>
           )}
 
+          {result.optionsOperators?.length > 0 && (
+            <Panel title="Opsi Jumlah Operator Cutting (Tanpa Target Waktu)" style={{ marginBottom: 24 }}>
+              <p style={{ fontSize: 12, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 8px" }}>
+                Total {result.totalQty.toLocaleString("id-ID")} pcs &middot; Kategori {result.skillCategory}
+              </p>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "var(--font-mono)", fontSize: 13 }}>
+                <thead>
+                  <tr style={{ textAlign: "left", color: "var(--text-faint)" }}>
+                    <th style={{ padding: "6px 10px" }}>Jika Pakai</th>
+                    <th style={{ padding: "6px 10px", textAlign: "right" }}>Total Jam Dibutuhkan</th>
+                    <th style={{ padding: "6px 10px" }}>Operator yang Disarankan</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {result.optionsOperators.map((o, i) => (
+                    <tr key={i} style={{ borderTop: "1px solid var(--steel)" }}>
+                      <td style={{ padding: "6px 10px" }}>{o.operators} orang</td>
+                      <td style={{ padding: "6px 10px", textAlign: "right" }}>{safeFixed(o.totalHoursNeeded, 1)} jam</td>
+                      <td style={{ padding: "6px 10px", color: "var(--text-muted)" }}>
+                        {o.suggestedOperators.map((op) => op.nama).join(", ")}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </Panel>
+          )}
+
           <Panel title="Aspek yang Perlu Diperhatikan">
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {result.considerations.map((c, i) => (
