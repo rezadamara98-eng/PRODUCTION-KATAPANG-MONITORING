@@ -127,7 +127,7 @@ export default function CapacityPlanner() {
 
         <button
           onClick={handleCalculate}
-          disabled={loading || !style || !hasAnyQty || !finishDate}
+          disabled={loading || !style || !hasAnyQty}
           style={{
             background: "var(--teal)",
             color: "var(--navy)",
@@ -136,11 +136,14 @@ export default function CapacityPlanner() {
             padding: "9px 24px",
             fontSize: 13,
             cursor: loading ? "default" : "pointer",
-            opacity: loading || !style || !hasAnyQty || !finishDate ? 0.6 : 1,
+            opacity: loading || !style || !hasAnyQty ? 0.6 : 1,
           }}
         >
           {loading ? "Menghitung..." : "Hitung Kebutuhan"}
         </button>
+        <p style={{ fontSize: 12, color: "var(--text-faint)", marginTop: 10, marginBottom: 0 }}>
+          Kosongkan Tanggal Mulai/Selesai untuk lihat simulasi jam kerja per opsi jumlah line (tanpa target deadline).
+        </p>
       </Panel>
 
       {error && (
@@ -158,7 +161,91 @@ export default function CapacityPlanner() {
         </div>
       )}
 
-      {result && (
+      {result && result.mode === "no-deadline" && (
+        <>
+          {(result.optionsKananWomen?.length > 0 || result.optionsKiri?.length > 0) && (
+            <Panel title="Opsi Jumlah Line (Tanpa Target Waktu)" style={{ marginBottom: 24 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                {result.optionsKananWomen?.length > 0 && (
+                  <div>
+                    <p style={{ fontSize: 12, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 8px" }}>
+                      Kanan + Women ({result.qtyKananWomen.toLocaleString("id-ID")} pcs)
+                    </p>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "var(--font-mono)", fontSize: 13 }}>
+                      <thead>
+                        <tr style={{ textAlign: "left", color: "var(--text-faint)" }}>
+                          <th style={{ padding: "6px 10px" }}>Jika Pakai</th>
+                          <th style={{ padding: "6px 10px", textAlign: "right" }}>Total Jam Dibutuhkan</th>
+                          <th style={{ padding: "6px 10px" }}>Line yang Disarankan</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {result.optionsKananWomen.map((o, i) => (
+                          <tr key={i} style={{ borderTop: "1px solid var(--steel)" }}>
+                            <td style={{ padding: "6px 10px" }}>{o.lines} line</td>
+                            <td style={{ padding: "6px 10px", textAlign: "right" }}>{safeFixed(o.totalHoursNeeded, 1)} jam</td>
+                            <td style={{ padding: "6px 10px", color: "var(--text-muted)" }}>
+                              {o.suggestedLines.map((l) => l.line).join(", ")}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                {result.optionsKiri?.length > 0 && (
+                  <div>
+                    <p style={{ fontSize: 12, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 8px" }}>
+                      Kiri ({result.qtyKiri.toLocaleString("id-ID")} pcs)
+                    </p>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "var(--font-mono)", fontSize: 13 }}>
+                      <thead>
+                        <tr style={{ textAlign: "left", color: "var(--text-faint)" }}>
+                          <th style={{ padding: "6px 10px" }}>Jika Pakai</th>
+                          <th style={{ padding: "6px 10px", textAlign: "right" }}>Total Jam Dibutuhkan</th>
+                          <th style={{ padding: "6px 10px" }}>Line yang Disarankan</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {result.optionsKiri.map((o, i) => (
+                          <tr key={i} style={{ borderTop: "1px solid var(--steel)" }}>
+                            <td style={{ padding: "6px 10px" }}>{o.lines} line</td>
+                            <td style={{ padding: "6px 10px", textAlign: "right" }}>{safeFixed(o.totalHoursNeeded, 1)} jam</td>
+                            <td style={{ padding: "6px 10px", color: "var(--text-muted)" }}>
+                              {o.suggestedLines.map((l) => l.line).join(", ")}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </Panel>
+          )}
+
+          <Panel title="Aspek yang Perlu Diperhatikan">
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {result.considerations.map((c, i) => (
+                <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                  <span
+                    style={{
+                      fontWeight: 700,
+                      fontSize: 13,
+                      color: c.type === "warning" ? "var(--amber, #b3720f)" : c.type === "ok" ? "var(--green)" : "var(--text-faint)",
+                    }}
+                  >
+                    {c.type === "warning" ? "\u26A0" : c.type === "ok" ? "\u2713" : "\u2139"}
+                  </span>
+                  <p style={{ fontSize: 13, color: "var(--text)", margin: 0 }}>{c.text}</p>
+                </div>
+              ))}
+            </div>
+          </Panel>
+        </>
+      )}
+
+      {result && result.mode !== "no-deadline" && (
         <>
           <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 24 }}>
             {result.qtyKananWomen > 0 && (

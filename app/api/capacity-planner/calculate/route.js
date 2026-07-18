@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 
 // Simulasi opsi jumlah line (1 sampai baseline-1), hitung tambahan jam kerja
 // yang dibutuhkan per hari supaya tetap selesai di deadline yang sama.
-function simulateLineOptions(qty, capacityPerHour, standardTotalHours, workingDays, baselineLines, attendanceFactor) {
+function simulateLineOptionsWithDeadline(qty, capacityPerHour, standardTotalHours, workingDays, baselineLines, attendanceFactor) {
   if (!qty || !capacityPerHour || baselineLines <= 1) return [];
 
   const options = [];
@@ -22,11 +22,20 @@ function simulateLineOptions(qty, capacityPerHour, standardTotalHours, workingDa
     const requiredTotalHoursPerLine = qty / (L * capacityPerHour * attendanceFactor);
     const additionalTotalHours = Math.max(0, requiredTotalHoursPerLine - standardTotalHours);
     const additionalHoursPerDay = workingDays > 0 ? additionalTotalHours / workingDays : 0;
-    options.push({
-      lines: L,
-      additionalHoursPerDay,
-      additionalTotalHours,
-    });
+    options.push({ lines: L, additionalHoursPerDay, additionalTotalHours });
+  }
+  return options;
+}
+
+// Mode tanpa deadline: langsung hitung total jam dibutuhkan untuk tiap opsi
+// jumlah line (1 sampai maksimal line yang tersedia historis untuk style itu).
+function computeHoursForLineOptions(qty, capacityPerHour, attendanceFactor, maxLines) {
+  if (!qty || !capacityPerHour || !maxLines || maxLines <= 0) return [];
+
+  const options = [];
+  for (let L = 1; L <= maxLines; L++) {
+    const totalHoursNeeded = qty / (L * capacityPerHour * attendanceFactor);
+    options.push({ lines: L, totalHoursNeeded });
   }
   return options;
 }
@@ -41,21 +50,26 @@ export async function POST(req) {
     const qtyKananWomen = qk + qw;
     const totalQty = qk + qi + qw;
 
-    if (!style || totalQty <= 0 || !startDate || !finishDate) {
+    if (!style || totalQty <= 0) {
       return NextResponse.json(
-        { error: "Style, minimal salah satu qty (Kanan/Kiri/Women), tanggal mulai, dan tanggal selesai harus diisi." },
+        { error: "Style dan minimal salah satu qty (Kanan/Kiri/Women) harus diisi." },
         { status: 400 }
       );
     }
 
-    const start = new Date(startDate);
-    const finish = new Date(finishDate);
+    const hasDeadline = Boolean(startDate && finishDate);
+    let start = null;
+    let finish = null;
 
-    if (isNaN(start.getTime()) || isNaN(finish.getTime()) || finish <= start) {
-      return NextResponse.json(
-        { error: "Tanggal selesai harus setelah tanggal mulai." },
-        { status: 400 }
-      );
+    if (hasDeadline) {
+      start = new Date(startDate);
+      finish = new Date(finishDate);
+      if (isNaN(start.getTime()) || isNaN(finish.getTime()) || finish <= start) {
+        return NextResponse.json(
+          { error: "Tanggal selesai harus setelah tanggal mulai." },
+          { status: 400 }
+        );
+      }
     }
 
     const skillCategory = getSkillCategoryForStyle(style);
@@ -73,44 +87,8 @@ export async function POST(req) {
       (s) => s.style.toLowerCase() === style.toLowerCase()
     ) || styleOptions.find((s) => s.style.toLowerCase().includes(style.toLowerCase()));
 
-    const { totalMinutes, workingDays } = calculateWorkingCapacity(start, finish);
-    const totalHours = totalMinutes / 60;
     const attendanceFactor = attendanceRate / 100;
 
-    // Kapasitas per line per JAM diambil LANGSUNG dari Target Kanan (kolom F,
-    // dipakai juga untuk Women) dan Target Kiri (kolom G) di Strong Point Line.
-    // Kanan + Women digabung jadi satu kebutuhan line (sumber kapasitas sama),
-    // Kiri dihitung terpisah.
-    let linesKananWomen = null;
-    let linesKiri = null;
-    let capacityKananPerLine = null; // total kapasitas 1 line selama periode (Kanan/Women)
-    let capacityKiriPerLine = null; // total kapasitas 1 line selama periode (Kiri)
-
-    if (refStyle) {
-      if (refStyle.avgTargetKanan > 0) {
-        capacityKananPerLine = refStyle.avgTargetKanan * totalHours * attendanceFactor;
-        if (qtyKananWomen > 0) linesKananWomen = Math.ceil(qtyKananWomen / capacityKananPerLine);
-      }
-      if (refStyle.avgTargetKiri > 0) {
-        capacityKiriPerLine = refStyle.avgTargetKiri * totalHours * attendanceFactor;
-        if (qi > 0) linesKiri = Math.ceil(qi / capacityKiriPerLine);
-      }
-    }
-
-    const simulationKananWomen = refStyle
-      ? simulateLineOptions(qtyKananWomen, refStyle.avgTargetKanan, totalHours, workingDays, linesKananWomen, attendanceFactor)
-      : [];
-    const simulationKiri = refStyle
-      ? simulateLineOptions(qi, refStyle.avgTargetKiri, totalHours, workingDays, linesKiri, attendanceFactor)
-      : [];
-
-    // Kapasitas cutting: skor Skill Matrik = kapasitas per JAM, jadi dikali total jam
-    // kerja efektif (bukan jumlah hari) x faktor kehadiran.
-    const capacityPerOperator = cuttingCap.average * totalHours * attendanceFactor;
-    const operatorsNeeded = capacityPerOperator > 0 ? Math.ceil(totalQty / capacityPerOperator) : null;
-
-    // Cari daftar line asli untuk style referensi, urutkan dari kapasitas terbesar,
-    // supaya bisa disarankan line spesifik mana yang dipakai.
     const matchingGroup = refStyle
       ? strongPointGroups.find((g) => g.style.toLowerCase() === refStyle.style.toLowerCase())
       : null;
@@ -123,19 +101,6 @@ export async function POST(req) {
         .sort((a, b) => b[sortField] - a[sortField])
         .slice(0, count)
         .map((l) => ({ line: l.line, capacity: l[sortField], efficiency: sortField === "targetKanan" ? l.effKanan : l.effKiri }));
-    }
-
-    const suggestedLinesKananWomen = suggestLines("targetKanan", linesKananWomen);
-    const suggestedLinesKiri = suggestLines("targetKiri", linesKiri);
-
-    // Sarankan operator cutting spesifik: skor tertinggi di kategori yang cocok.
-    let suggestedOperators = [];
-    if (skillCategory && operatorsNeeded) {
-      suggestedOperators = [...skillMatrikRows]
-        .filter((r) => r[skillCategory] > 0)
-        .sort((a, b) => b[skillCategory] - a[skillCategory])
-        .slice(0, operatorsNeeded)
-        .map((r) => ({ nama: r.nama, kapasitas: r[skillCategory], job: r.job }));
     }
 
     const considerations = [];
@@ -173,6 +138,93 @@ export async function POST(req) {
       });
     }
 
+    considerations.push({
+      type: "info",
+      text: "Perhitungan ini hanya mencakup proses cutting. Pastikan kapasitas sewing, finishing, dan ketersediaan material juga dicek terpisah.",
+    });
+
+    // ===== MODE TANPA DEADLINE =====
+    if (!hasDeadline) {
+      const maxLinesKananWomen = groupLines.filter((l) => l.targetKanan > 0).length;
+      const maxLinesKiri = groupLines.filter((l) => l.targetKiri > 0).length;
+
+      const optionsKananWomen = refStyle
+        ? computeHoursForLineOptions(qtyKananWomen, refStyle.avgTargetKanan, attendanceFactor, maxLinesKananWomen).map((o) => ({
+            ...o,
+            suggestedLines: suggestLines("targetKanan", o.lines),
+          }))
+        : [];
+      const optionsKiri = refStyle
+        ? computeHoursForLineOptions(qi, refStyle.avgTargetKiri, attendanceFactor, maxLinesKiri).map((o) => ({
+            ...o,
+            suggestedLines: suggestLines("targetKiri", o.lines),
+          }))
+        : [];
+
+      considerations.push({
+        type: "info",
+        text: "Tidak ada tanggal target, jadi hasil di bawah adalah total jam kerja dibutuhkan untuk tiap opsi jumlah line, tanpa batas waktu.",
+      });
+
+      return NextResponse.json({
+        mode: "no-deadline",
+        qtyKanan: qk,
+        qtyKiri: qi,
+        qtyWomen: qw,
+        qtyKananWomen,
+        totalQty,
+        attendanceRate,
+        refStyle,
+        skillCategory,
+        avgCuttingCapacityPerHour: cuttingCap.average,
+        optionsKananWomen,
+        optionsKiri,
+        considerations,
+      });
+    }
+
+    // ===== MODE DENGAN DEADLINE (seperti sebelumnya) =====
+    const { totalMinutes, workingDays } = calculateWorkingCapacity(start, finish);
+    const totalHours = totalMinutes / 60;
+
+    let linesKananWomen = null;
+    let linesKiri = null;
+    let capacityKananPerLine = null;
+    let capacityKiriPerLine = null;
+
+    if (refStyle) {
+      if (refStyle.avgTargetKanan > 0) {
+        capacityKananPerLine = refStyle.avgTargetKanan * totalHours * attendanceFactor;
+        if (qtyKananWomen > 0) linesKananWomen = Math.ceil(qtyKananWomen / capacityKananPerLine);
+      }
+      if (refStyle.avgTargetKiri > 0) {
+        capacityKiriPerLine = refStyle.avgTargetKiri * totalHours * attendanceFactor;
+        if (qi > 0) linesKiri = Math.ceil(qi / capacityKiriPerLine);
+      }
+    }
+
+    const simulationKananWomen = refStyle
+      ? simulateLineOptionsWithDeadline(qtyKananWomen, refStyle.avgTargetKanan, totalHours, workingDays, linesKananWomen, attendanceFactor)
+      : [];
+    const simulationKiri = refStyle
+      ? simulateLineOptionsWithDeadline(qi, refStyle.avgTargetKiri, totalHours, workingDays, linesKiri, attendanceFactor)
+      : [];
+
+    const capacityPerOperator = cuttingCap.average * totalHours * attendanceFactor;
+    const operatorsNeeded = capacityPerOperator > 0 ? Math.ceil(totalQty / capacityPerOperator) : null;
+
+    const suggestedLinesKananWomen = suggestLines("targetKanan", linesKananWomen);
+    const suggestedLinesKiri = suggestLines("targetKiri", linesKiri);
+
+    let suggestedOperators = [];
+    if (skillCategory && operatorsNeeded) {
+      suggestedOperators = [...skillMatrikRows]
+        .filter((r) => r[skillCategory] > 0)
+        .sort((a, b) => b[skillCategory] - a[skillCategory])
+        .slice(0, operatorsNeeded)
+        .map((r) => ({ nama: r.nama, kapasitas: r[skillCategory], job: r.job }));
+    }
+
     if (operatorsNeeded && operatorsNeeded > operatorList.length) {
       considerations.push({
         type: "warning",
@@ -180,12 +232,8 @@ export async function POST(req) {
       });
     }
 
-    considerations.push({
-      type: "info",
-      text: "Perhitungan ini hanya mencakup proses cutting. Pastikan kapasitas sewing, finishing, dan ketersediaan material juga dicek terpisah.",
-    });
-
     return NextResponse.json({
+      mode: "with-deadline",
       qtyKanan: qk,
       qtyKiri: qi,
       qtyWomen: qw,
