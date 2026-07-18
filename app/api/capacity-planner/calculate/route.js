@@ -8,6 +8,8 @@ import {
   getAverageSkillCuttingCapacity,
   getSkillMatrikCuttingData,
   getCriticalPointsForStyle,
+  getGudangJadiMpRatios,
+  getSupplyMpRatios,
 } from "@/lib/sheets";
 import { calculateWorkingCapacity } from "@/lib/dateUtils";
 
@@ -278,6 +280,38 @@ export async function POST(req) {
     const capacityPerOperator = cuttingCap.average * totalHours * attendanceFactor;
     const operatorsNeeded = capacityPerOperator > 0 ? Math.ceil(totalQty / capacityPerOperator) : null;
 
+    // MP Gudang Jadi: rate keseluruhan (pcs/jam) dari Total Qty / Total Jam,
+    // diskalakan proporsional terhadap rasio standar (per Target pcs/jam).
+    const gudangJadiRatios = await getGudangJadiMpRatios(style);
+    let gudangJadiMp = null;
+    if (gudangJadiRatios && gudangJadiRatios.target > 0 && totalHours > 0) {
+      const ratePerHour = totalQty / totalHours;
+      const factor = ratePerHour / gudangJadiRatios.target;
+      gudangJadiMp = {
+        ratePerHour,
+        persiapan: Math.ceil(factor * gudangJadiRatios.persiapan),
+        packingEnvelope: Math.ceil(factor * gudangJadiRatios.packingEnvelope),
+        packingInnerCarton: Math.ceil(factor * gudangJadiRatios.packingInnerCarton),
+      };
+    }
+
+    // MP Supply: rate sama dengan Gudang Jadi (Total Qty / Total Jam),
+    // diskalakan proporsional terhadap rasio standar di KEBUTUHAN MP SUPPLY.
+    const supplyRatios = await getSupplyMpRatios(style);
+    let supplyMp = null;
+    if (supplyRatios && supplyRatios.target > 0 && totalHours > 0) {
+      const ratePerHour = totalQty / totalHours;
+      const factor = ratePerHour / supplyRatios.target;
+      supplyMp = {
+        ratePerHour,
+        cuttingSynthetic: Math.ceil(factor * supplyRatios.cuttingSynthetic),
+        accessories: Math.ceil(factor * supplyRatios.accessories),
+        m4: Math.ceil(factor * supplyRatios.m4),
+        distribusi: Math.ceil(factor * supplyRatios.distribusi),
+        presub: Math.ceil(factor * supplyRatios.presub),
+      };
+    }
+
     const suggestedLinesKananWomen = suggestLines("targetKanan", linesKananWomen);
     const suggestedLinesKiri = suggestLines("targetKiri", linesKiri);
 
@@ -323,6 +357,8 @@ export async function POST(req) {
       operatorCapacityRange,
       lineCapacityRangeKanan,
       lineCapacityRangeKiri,
+      gudangJadiMp,
+      supplyMp,
       criticalPoints,
       considerations,
     });

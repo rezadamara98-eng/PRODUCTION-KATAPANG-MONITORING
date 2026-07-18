@@ -8,6 +8,39 @@ function safeFixed(val, digits = 1) {
   return Number.isFinite(n) ? n.toFixed(digits) : "-";
 }
 
+function GroupHeader({ children }) {
+  return (
+    <div
+      style={{
+        background: "var(--navy)",
+        color: "#ffffff",
+        fontFamily: "var(--font-display)",
+        fontWeight: 700,
+        fontSize: 13,
+        letterSpacing: "0.04em",
+        padding: "9px 20px",
+        marginBottom: 12,
+        clipPath: "polygon(0 0, 100% 0, calc(100% - 14px) 100%, 0 100%)",
+        textTransform: "uppercase",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function MpCard({ label, value, unit, note, accent = "var(--teal)" }) {
+  return (
+    <div style={{ background: "var(--panel)", border: "1px solid var(--steel)", borderLeft: `4px solid ${accent}`, padding: "16px 18px" }}>
+      <p style={{ fontSize: 10, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 6px" }}>{label}</p>
+      <p style={{ fontSize: 26, fontWeight: 700, color: "var(--navy)", margin: 0 }}>
+        {value} <span style={{ fontSize: 13, color: "var(--text-muted)", fontWeight: 400 }}>{unit}</span>
+      </p>
+      {note && <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "6px 0 0" }}>{note}</p>}
+    </div>
+  );
+}
+
 function CriticalPointsSection({ points }) {
   if (!points) return null;
   const { cutting = [], produksi = [] } = points;
@@ -319,62 +352,67 @@ export default function CapacityPlanner() {
 
       {result && result.mode !== "no-deadline" && (
         <>
-          <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 24 }}>
+          <GroupHeader>1. Kebutuhan Manpower Sewing</GroupHeader>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 12, marginBottom: 24 }}>
             {result.qtyKananWomen > 0 && (
-              <div style={{ flex: "1 1 260px", background: "var(--panel)", border: "1px solid var(--steel)", borderLeft: "4px solid var(--navy)", padding: "18px 20px" }}>
-                <p style={{ fontSize: 11, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 8px" }}>
-                  Line Kanan + Women Dibutuhkan
-                </p>
-                <p style={{ fontSize: 30, fontWeight: 700, color: "var(--navy)", margin: 0 }}>
-                  {result.linesKananWomen ?? "-"} <span style={{ fontSize: 14, color: "var(--text-muted)", fontWeight: 400 }}>line</span>
-                </p>
-                <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "8px 0 0" }}>
-                  {result.lineCapacityRangeKanan ? (
-                    <>
-                      Rata-rata {safeFixed(result.lineCapacityRangeKanan.average, 0)} &middot; tertinggi{" "}
-                      {result.lineCapacityRangeKanan.highest} &middot; terendah {result.lineCapacityRangeKanan.lowest} pcs/jam
-                    </>
-                  ) : (
-                    "Kapasitas line tidak tersedia"
-                  )}
-                </p>
-              </div>
+              <MpCard
+                label="Line Kanan + Women"
+                value={result.linesKananWomen ?? "-"}
+                unit="line"
+                accent="var(--navy)"
+                note={
+                  result.lineCapacityRangeKanan
+                    ? `Rata-rata ${safeFixed(result.lineCapacityRangeKanan.average, 0)} \u00b7 tertinggi ${result.lineCapacityRangeKanan.highest} \u00b7 terendah ${result.lineCapacityRangeKanan.lowest} pcs/jam`
+                    : "Kapasitas line tidak tersedia"
+                }
+              />
             )}
             {result.qtyKiri > 0 && (
-              <div style={{ flex: "1 1 260px", background: "var(--panel)", border: "1px solid var(--steel)", borderLeft: "4px solid var(--navy)", padding: "18px 20px" }}>
-                <p style={{ fontSize: 11, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 8px" }}>
-                  Line Kiri Dibutuhkan
-                </p>
-                <p style={{ fontSize: 30, fontWeight: 700, color: "var(--navy)", margin: 0 }}>
-                  {result.linesKiri ?? "-"} <span style={{ fontSize: 14, color: "var(--text-muted)", fontWeight: 400 }}>line</span>
-                </p>
-                <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "8px 0 0" }}>
-                  {result.lineCapacityRangeKiri ? (
-                    <>
-                      Rata-rata {safeFixed(result.lineCapacityRangeKiri.average, 0)} &middot; tertinggi{" "}
-                      {result.lineCapacityRangeKiri.highest} &middot; terendah {result.lineCapacityRangeKiri.lowest} pcs/jam
-                    </>
-                  ) : (
-                    "Kapasitas line tidak tersedia"
-                  )}
-                </p>
-              </div>
+              <MpCard
+                label="Line Kiri"
+                value={result.linesKiri ?? "-"}
+                unit="line"
+                accent="var(--navy)"
+                note={
+                  result.lineCapacityRangeKiri
+                    ? `Rata-rata ${safeFixed(result.lineCapacityRangeKiri.average, 0)} \u00b7 tertinggi ${result.lineCapacityRangeKiri.highest} \u00b7 terendah ${result.lineCapacityRangeKiri.lowest} pcs/jam`
+                    : "Kapasitas line tidak tersedia"
+                }
+              />
             )}
-            <div style={{ flex: "1 1 260px", background: "var(--panel)", border: "1px solid var(--steel)", borderLeft: "4px solid var(--teal)", padding: "18px 20px" }}>
-              <p style={{ fontSize: 11, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 8px" }}>
-                Operator Cutting Dibutuhkan
-              </p>
-              <p style={{ fontSize: 30, fontWeight: 700, color: "var(--navy)", margin: 0 }}>
-                {result.operatorsNeeded ?? "-"} <span style={{ fontSize: 14, color: "var(--text-muted)", fontWeight: 400 }}>orang</span>
-              </p>
-              <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "8px 0 0" }}>
-                Kategori: {result.skillCategory || "tidak terdeteksi"} &middot; rata-rata {safeFixed(result.avgCuttingCapacityPerHour, 1)} pcs/jam
-                {result.operatorCapacityRange && (
-                  <> &middot; tertinggi {result.operatorCapacityRange.highest} &middot; terendah {result.operatorCapacityRange.lowest} pcs/jam</>
-                )}
-              </p>
-            </div>
           </div>
+
+          <GroupHeader>2. Kebutuhan Manpower Supply</GroupHeader>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginBottom: 24 }}>
+            <MpCard
+              label="Cutting (Leather)"
+              value={result.operatorsNeeded ?? "-"}
+              unit="org"
+              note={`${result.skillCategory || "?"} \u00b7 rata-rata ${safeFixed(result.avgCuttingCapacityPerHour, 1)}${
+                result.operatorCapacityRange ? ` \u00b7 tinggi ${result.operatorCapacityRange.highest} \u00b7 rendah ${result.operatorCapacityRange.lowest}` : ""
+              } pcs/jam`}
+            />
+            {result.supplyMp && (
+              <>
+                <MpCard label="Cutting Synthetic" value={result.supplyMp.cuttingSynthetic} unit="org" />
+                <MpCard label="Accessories" value={result.supplyMp.accessories} unit="org" />
+                <MpCard label="M4" value={result.supplyMp.m4} unit="org" />
+                <MpCard label="Distribusi" value={result.supplyMp.distribusi} unit="org" />
+                <MpCard label="Presub" value={result.supplyMp.presub} unit="org" />
+              </>
+            )}
+          </div>
+
+          {result.gudangJadiMp && (
+            <>
+              <GroupHeader>3. Kebutuhan Manpower Gudang Jadi</GroupHeader>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12, marginBottom: 24 }}>
+                <MpCard label="Persiapan" value={result.gudangJadiMp.persiapan} unit="orang" accent="var(--green)" />
+                <MpCard label="Packing Envelope" value={result.gudangJadiMp.packingEnvelope} unit="orang" accent="var(--green)" />
+                <MpCard label="Packing Inner Carton" value={result.gudangJadiMp.packingInnerCarton} unit="orang" accent="var(--green)" />
+              </div>
+            </>
+          )}
 
           {(result.simulationKananWomen?.length > 0 || result.simulationKiri?.length > 0) && (
             <Panel title="Simulasi Opsi Jumlah Line" style={{ marginBottom: 24 }}>
