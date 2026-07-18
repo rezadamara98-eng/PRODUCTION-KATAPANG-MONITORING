@@ -9,7 +9,6 @@ import {
   Bar,
   XAxis,
   YAxis,
-  CartesianGrid,
   Tooltip,
   Legend,
   ResponsiveContainer,
@@ -123,7 +122,6 @@ export default function KatapangMonitoring() {
   const shipment = achievement?.shipment || {};
   const absensi = manpower?.absensi || [];
   const jamKerja = manpower?.jamKerja;
-  const strongPoint = manpower?.strongPoint || [];
 
   const shipmentChartData = [
     { name: "Kekurangan Produksi", value: shipment.totalKekuranganProduksi || 0 },
@@ -145,15 +143,6 @@ export default function KatapangMonitoring() {
 
   const absensiChartData = absensi.map((a) => ({ name: a.jenisAbsen, value: a.jumlah }));
   const absensiColors = [GRAY, TEAL, AMBER, RED, NAVY];
-
-  const strongPointChartData = strongPoint
-    .flatMap((g) =>
-      g.lines.flatMap((l) => [
-        { name: `${g.style} ${l.line} Kanan`, value: l.effKanan },
-        { name: `${g.style} ${l.line} Kiri`, value: l.effKiri },
-      ])
-    )
-    .filter((d) => d.value > 0);
 
   return (
     <div>
@@ -222,7 +211,7 @@ export default function KatapangMonitoring() {
         </Panel>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14, marginBottom: 14 }}>
         <Panel title="Monitoring Shipment">
           <div style={{ height: 200 }}>
             {hasShipmentData ? (
@@ -263,26 +252,38 @@ export default function KatapangMonitoring() {
         </Panel>
       </div>
 
-      <Panel title="Strong Point Line - Efisiensi per Line (Kanan &amp; Kiri)" style={{ marginBottom: 24 }}>
-        <div style={{ height: Math.max(200, strongPointChartData.length * 26) }}>
-          {strongPointChartData.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={strongPointChartData} layout="vertical" margin={{ left: 20 }}>
-                <CartesianGrid stroke="var(--steel)" strokeDasharray="2 4" horizontal={false} />
-                <XAxis type="number" stroke="var(--text-faint)" fontSize={11} />
-                <YAxis type="category" dataKey="name" stroke="var(--text-faint)" fontSize={11} width={180} />
-                <Tooltip />
-                <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                  {strongPointChartData.map((d, i) => (
-                    <Cell key={i} fill={d.value >= 100 ? GREEN : d.value >= 85 ? AMBER : RED} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <p style={{ color: "var(--text-faint)", fontSize: 13 }}>Belum ada data.</p>
-          )}
-        </div>
+      <Panel title="Detail SPO Kekurangan Produksi &amp; Envelope">
+        <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "var(--font-mono)", fontSize: 13 }}>
+          <thead>
+            <tr style={{ textAlign: "left", color: "var(--text-faint)" }}>
+              <th style={{ padding: "6px 10px" }}>SPO</th>
+              <th style={{ padding: "6px 10px" }}>Product</th>
+              <th style={{ padding: "6px 10px", textAlign: "right" }}>Kekurangan Produksi</th>
+              <th style={{ padding: "6px 10px", textAlign: "right" }}>Kekurangan Envelope</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(achievement?.shipmentDetail || []).map((d, i) => (
+              <tr key={i} style={{ borderTop: "1px solid var(--steel)" }}>
+                <td style={{ padding: "6px 10px" }}>{d.spo}</td>
+                <td style={{ padding: "6px 10px", color: "var(--text-muted)" }}>{d.style}</td>
+                <td style={{ padding: "6px 10px", textAlign: "right", color: d.kekuranganProduksi < 0 ? "var(--red)" : "var(--text)" }}>
+                  {d.kekuranganProduksi.toLocaleString("id-ID")}
+                </td>
+                <td style={{ padding: "6px 10px", textAlign: "right", color: d.kekuranganEnvelope < 0 ? "var(--red)" : "var(--text)" }}>
+                  {d.kekuranganEnvelope.toLocaleString("id-ID")}
+                </td>
+              </tr>
+            ))}
+            {(achievement?.shipmentDetail || []).length === 0 && (
+              <tr>
+                <td colSpan={4} style={{ padding: "12px 10px", color: "var(--text-faint)" }}>
+                  Tidak ada SPO yang kekurangan produksi/envelope saat ini.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </Panel>
     </div>
   );

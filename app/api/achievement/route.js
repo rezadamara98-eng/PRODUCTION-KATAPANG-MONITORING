@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const { planSewRows, planDistRows, gudangSummary } = await getAchievementRawBundle();
+    const { planSewRows, planDistRows, gudangDetail, gudangSummary } = await getAchievementRawBundle();
 
     const sewYesterday = getLastCompleteGroupRows(planSewRows, "tanggal", "achievement");
     const validSew = sewYesterday.filter((r) => Number.isFinite(r.achievement) && r.achievement > 0);
@@ -18,12 +18,24 @@ export async function GET() {
     const achievementDistribusi =
       validDist.length > 0 ? validDist.reduce((sum, r) => sum + r.achievement, 0) / validDist.length : 0;
 
+    // Daftar SPO yang kekurangan produksi dan/atau envelope, diurutkan dari yang paling parah.
+    const shipmentDetail = gudangDetail
+      .filter((r) => r.kekuranganProduksi < 0 || r.kekuranganEnvelope < 0)
+      .sort((a, b) => a.kekuranganProduksi + a.kekuranganEnvelope - (b.kekuranganProduksi + b.kekuranganEnvelope))
+      .map((r) => ({
+        spo: r.spo,
+        style: r.style,
+        kekuranganProduksi: r.kekuranganProduksi,
+        kekuranganEnvelope: r.kekuranganEnvelope,
+      }));
+
     return NextResponse.json({
       achievementSewing,
       achievementDistribusi,
       sewYesterday,
       distYesterday,
       shipment: gudangSummary,
+      shipmentDetail,
       fetchedAt: new Date().toISOString(),
     });
   } catch (err) {
