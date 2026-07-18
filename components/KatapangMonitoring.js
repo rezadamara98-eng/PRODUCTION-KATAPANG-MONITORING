@@ -122,7 +122,6 @@ export default function KatapangMonitoring() {
   const shipment = achievement?.shipment || {};
   const absensi = manpower?.absensi || [];
   const jamKerja = manpower?.jamKerja;
-  const kapasitasCutting = manpower?.kapasitasCutting || [];
   const strongPoint = manpower?.strongPoint || [];
 
   const shipmentChartData = [
@@ -131,6 +130,7 @@ export default function KatapangMonitoring() {
     { name: "Qty Shipment", value: shipment.totalQtyShipment || 0 },
     { name: "Qty Shipment Pack", value: shipment.totalQtyShipmentPack || 0 },
   ];
+  const hasShipmentData = shipmentChartData.some((d) => d.value !== 0);
 
   const jamKerjaChartData = jamKerja
     ? [
@@ -140,13 +140,19 @@ export default function KatapangMonitoring() {
         { name: "Support", SM: jamKerja.smSupport, Aktual: jamKerja.actualSupport },
       ]
     : [];
+  const hasJamKerjaData = jamKerjaChartData.some((d) => d.SM || d.Aktual);
 
   const absensiChartData = absensi.map((a) => ({ name: a.jenisAbsen, value: a.jumlah }));
   const absensiColors = [GRAY, TEAL, AMBER, RED, NAVY];
 
-  const kapasitasChartData = [...kapasitasCutting]
-    .sort((a, b) => b.kapasitas - a.kapasitas)
-    .map((k) => ({ name: k.nama, value: k.kapasitas }));
+  const strongPointChartData = strongPoint
+    .flatMap((g) =>
+      g.lines.flatMap((l) => [
+        { name: `${g.style} ${l.line} Kanan`, value: l.effKanan },
+        { name: `${g.style} ${l.line} Kiri`, value: l.effKiri },
+      ])
+    )
+    .filter((d) => d.value > 0);
 
   return (
     <div>
@@ -215,27 +221,14 @@ export default function KatapangMonitoring() {
         </Panel>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 14, marginBottom: 24 }}>
-        <Panel title="Top 10 Kapasitas Cutting">
-          <div style={{ height: 260 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={kapasitasChartData} layout="vertical" margin={{ left: 20 }}>
-                <CartesianGrid stroke="var(--steel)" strokeDasharray="2 4" horizontal={false} />
-                <XAxis type="number" stroke="var(--text-faint)" fontSize={11} />
-                <YAxis type="category" dataKey="name" stroke="var(--text-faint)" fontSize={11} width={100} />
-                <Tooltip />
-                <Bar dataKey="value" fill={NAVY} radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </Panel>
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <Panel title="Monitoring Shipment" style={{ flex: 1 }}>
-            <div style={{ height: 100 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14, marginBottom: 24 }}>
+        <Panel title="Monitoring Shipment">
+          <div style={{ height: 200 }}>
+            {hasShipmentData ? (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={shipmentChartData} layout="vertical" margin={{ left: 20 }}>
                   <XAxis type="number" stroke="var(--text-faint)" fontSize={10} />
-                  <YAxis type="category" dataKey="name" stroke="var(--text-faint)" fontSize={10} width={110} />
+                  <YAxis type="category" dataKey="name" stroke="var(--text-faint)" fontSize={10} width={120} />
                   <Tooltip />
                   <Bar dataKey="value" radius={[0, 4, 4, 0]}>
                     {shipmentChartData.map((d, i) => (
@@ -244,10 +237,14 @@ export default function KatapangMonitoring() {
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
-            </div>
-          </Panel>
-          <Panel title="Jam Kerja: SM vs Aktual" style={{ flex: 1 }}>
-            <div style={{ height: 100 }}>
+            ) : (
+              <p style={{ color: "var(--text-faint)", fontSize: 13 }}>Belum ada data.</p>
+            )}
+          </div>
+        </Panel>
+        <Panel title="Jam Kerja: SM vs Aktual">
+          <div style={{ height: 200 }}>
+            {hasJamKerjaData ? (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={jamKerjaChartData}>
                   <XAxis dataKey="name" stroke="var(--text-faint)" fontSize={10} />
@@ -258,103 +255,34 @@ export default function KatapangMonitoring() {
                   <Bar dataKey="Aktual" fill={TEAL} radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
-            </div>
-          </Panel>
+            ) : (
+              <p style={{ color: "var(--text-faint)", fontSize: 13 }}>Belum ada data.</p>
+            )}
+          </div>
+        </Panel>
+      </div>
+
+      <Panel title="Strong Point Line - Efisiensi per Line (Kanan &amp; Kiri)" style={{ marginBottom: 24 }}>
+        <div style={{ height: Math.max(200, strongPointChartData.length * 26) }}>
+          {strongPointChartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={strongPointChartData} layout="vertical" margin={{ left: 20 }}>
+                <CartesianGrid stroke="var(--steel)" strokeDasharray="2 4" horizontal={false} />
+                <XAxis type="number" stroke="var(--text-faint)" fontSize={11} />
+                <YAxis type="category" dataKey="name" stroke="var(--text-faint)" fontSize={11} width={180} />
+                <Tooltip />
+                <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                  {strongPointChartData.map((d, i) => (
+                    <Cell key={i} fill={d.value >= 100 ? GREEN : d.value >= 85 ? AMBER : RED} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <p style={{ color: "var(--text-faint)", fontSize: 13 }}>Belum ada data.</p>
+          )}
         </div>
-      </div>
-
-      <Panel title="Skill Matrik Cutting (Top 10)" style={{ marginBottom: 24 }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "var(--font-mono)", fontSize: 13 }}>
-          <thead>
-            <tr style={{ textAlign: "left", color: "var(--text-faint)" }}>
-              <th style={{ padding: "6px 10px" }}>Nama</th>
-              <th style={{ padding: "6px 10px" }}>Job</th>
-              <th style={{ padding: "6px 10px", textAlign: "right" }}>Lama Kerja</th>
-              <th style={{ padding: "6px 10px" }}>Pemahaman Artikel</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(manpower?.skillMatrik || []).map((s, i) => (
-              <tr key={i} style={{ borderTop: "1px solid var(--steel)" }}>
-                <td style={{ padding: "6px 10px" }}>{s.nama}</td>
-                <td style={{ padding: "6px 10px", color: "var(--text-muted)" }}>{s.job}</td>
-                <td style={{ padding: "6px 10px", textAlign: "right" }}>{safeFixed(s.lamaBekerja, 1)} th</td>
-                <td
-                  style={{
-                    padding: "6px 10px",
-                    color:
-                      s.pemahamanArtikel.toLowerCase().includes("kurang")
-                        ? "var(--red)"
-                        : s.pemahamanArtikel.toLowerCase() === "faham"
-                        ? "var(--green)"
-                        : "var(--text-muted)",
-                  }}
-                >
-                  {s.pemahamanArtikel}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
       </Panel>
-
-      <p
-        style={{
-          fontFamily: "var(--font-display)",
-          fontSize: 12,
-          letterSpacing: "0.1em",
-          color: "var(--text-faint)",
-          textTransform: "uppercase",
-          marginBottom: 10,
-        }}
-      >
-        Strong Point Line - Dikelompokkan per Style
-      </p>
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        {strongPoint.map((g) => (
-          <Panel key={g.style} title={`${g.style}${g.buyer ? " \u00b7 " + g.buyer : ""}`}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "var(--font-mono)", fontSize: 13 }}>
-              <thead>
-                <tr style={{ textAlign: "left", color: "var(--text-faint)" }}>
-                  <th style={{ padding: "6px 10px" }}>Line</th>
-                  <th style={{ padding: "6px 10px", textAlign: "right" }}>Target Kanan</th>
-                  <th style={{ padding: "6px 10px", textAlign: "right" }}>Target Kiri</th>
-                  <th style={{ padding: "6px 10px", textAlign: "right" }}>Efisiensi Kanan</th>
-                  <th style={{ padding: "6px 10px", textAlign: "right" }}>Efisiensi Kiri</th>
-                </tr>
-              </thead>
-              <tbody>
-                {g.lines.map((l, i) => (
-                  <tr key={i} style={{ borderTop: "1px solid var(--steel)" }}>
-                    <td style={{ padding: "6px 10px" }}>{l.line}</td>
-                    <td style={{ padding: "6px 10px", textAlign: "right" }}>{l.targetKanan}</td>
-                    <td style={{ padding: "6px 10px", textAlign: "right" }}>{l.targetKiri}</td>
-                    <td
-                      style={{
-                        padding: "6px 10px",
-                        textAlign: "right",
-                        color: l.effKanan >= 100 ? "var(--green)" : l.effKanan >= 85 ? "var(--amber, #b3720f)" : "var(--red)",
-                      }}
-                    >
-                      {safeFixed(l.effKanan, 1)}%
-                    </td>
-                    <td
-                      style={{
-                        padding: "6px 10px",
-                        textAlign: "right",
-                        color: l.effKiri >= 100 ? "var(--green)" : l.effKiri >= 85 ? "var(--amber, #b3720f)" : "var(--red)",
-                      }}
-                    >
-                      {safeFixed(l.effKiri, 1)}%
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </Panel>
-        ))}
-        {strongPoint.length === 0 && <div style={{ color: "var(--text-faint)", fontSize: 13 }}>Belum ada data.</div>}
-      </div>
     </div>
   );
 }
