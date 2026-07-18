@@ -82,7 +82,7 @@ function computeStationFlow(rate, avgCuttingCapacityPerHour, supplyRatios, gudan
     const bufferPercent = ((rounded - exact) / exact) * 100;
     const hoursNeeded =
       opts.hoursNeeded != null ? opts.hoursNeeded : estimatedHours != null ? estimatedHours * (exact / rounded) : null;
-    stations.push({ name, exact, rounded, bufferPercent, hoursNeeded, lines: opts.lines || null });
+    stations.push({ name, exact, rounded, bufferPercent, hoursNeeded, lines: opts.lines || null, unit: opts.unit || "org" });
   }
 
   if (avgCuttingCapacityPerHour > 0) {
@@ -107,7 +107,7 @@ function computeStationFlow(rate, avgCuttingCapacityPerHour, supplyRatios, gudan
       sewingInfo.avgTargetKanan > 0
         ? sewingInfo.qtyKananWomen / (roundedKanan * sewingInfo.avgTargetKanan)
         : null;
-    addStation("Sewing Kanan", exactKanan, { lines: sewingInfo.suggestedLinesKananWomen, hoursNeeded: hoursNeededKanan });
+    addStation("Sewing Kanan", exactKanan, { lines: sewingInfo.suggestedLinesKananWomen, hoursNeeded: hoursNeededKanan, unit: "line" });
   }
   if (sewingInfo?.qtyKiri > 0 && sewingInfo.capacityKiriPerLine > 0) {
     const exactKiri = sewingInfo.qtyKiri / sewingInfo.capacityKiriPerLine;
@@ -116,7 +116,7 @@ function computeStationFlow(rate, avgCuttingCapacityPerHour, supplyRatios, gudan
       sewingInfo.avgTargetKiri > 0
         ? sewingInfo.qtyKiri / (roundedKiri * sewingInfo.avgTargetKiri)
         : null;
-    addStation("Sewing Kiri", exactKiri, { lines: sewingInfo.suggestedLinesKiri, hoursNeeded: hoursNeededKiri });
+    addStation("Sewing Kiri", exactKiri, { lines: sewingInfo.suggestedLinesKiri, hoursNeeded: hoursNeededKiri, unit: "line" });
   }
 
   if (gudangRatios && gudangRatios.target > 0) {

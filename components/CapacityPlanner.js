@@ -59,7 +59,7 @@ function StationCard({ station, isBottleneck }) {
           {station.lines.map((l) => l.line).join(", ")}
         </p>
       )}
-      <p style={{ fontSize: 20, fontWeight: 700, color: "var(--navy)", margin: 0 }}>{station.rounded} <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 400 }}>org</span></p>
+      <p style={{ fontSize: 20, fontWeight: 700, color: "var(--navy)", margin: 0 }}>{station.rounded} <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 400 }}>{station.unit || "org"}</span></p>
       {station.hoursNeeded != null && (
         <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "4px 0 0" }}>
           jam kerja {safeFixed(station.hoursNeeded, 1)} jam
