@@ -329,7 +329,14 @@ export default function CapacityPlanner() {
                   {result.linesKananWomen ?? "-"} <span style={{ fontSize: 14, color: "var(--text-muted)", fontWeight: 400 }}>line</span>
                 </p>
                 <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "8px 0 0" }}>
-                  Kapasitas line: {safeFixed(result.refStyle?.avgTargetKanan, 0)} pcs/jam
+                  {result.lineCapacityRangeKanan ? (
+                    <>
+                      Rata-rata {safeFixed(result.lineCapacityRangeKanan.average, 0)} &middot; tertinggi{" "}
+                      {result.lineCapacityRangeKanan.highest} &middot; terendah {result.lineCapacityRangeKanan.lowest} pcs/jam
+                    </>
+                  ) : (
+                    "Kapasitas line tidak tersedia"
+                  )}
                 </p>
               </div>
             )}
@@ -342,7 +349,14 @@ export default function CapacityPlanner() {
                   {result.linesKiri ?? "-"} <span style={{ fontSize: 14, color: "var(--text-muted)", fontWeight: 400 }}>line</span>
                 </p>
                 <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "8px 0 0" }}>
-                  Kapasitas line: {safeFixed(result.refStyle?.avgTargetKiri, 0)} pcs/jam
+                  {result.lineCapacityRangeKiri ? (
+                    <>
+                      Rata-rata {safeFixed(result.lineCapacityRangeKiri.average, 0)} &middot; tertinggi{" "}
+                      {result.lineCapacityRangeKiri.highest} &middot; terendah {result.lineCapacityRangeKiri.lowest} pcs/jam
+                    </>
+                  ) : (
+                    "Kapasitas line tidak tersedia"
+                  )}
                 </p>
               </div>
             )}

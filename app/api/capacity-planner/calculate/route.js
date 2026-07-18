@@ -125,6 +125,19 @@ export async function POST(req) {
         .map((l) => ({ line: l.line, capacity: l[sortField], efficiency: sortField === "targetKanan" ? l.effKanan : l.effKiri }));
     }
 
+    function lineCapacityRange(sortField) {
+      const values = groupLines.map((l) => l[sortField]).filter((v) => v > 0);
+      if (values.length === 0) return null;
+      return {
+        highest: Math.max(...values),
+        lowest: Math.min(...values),
+        average: values.reduce((a, b) => a + b, 0) / values.length,
+      };
+    }
+
+    const lineCapacityRangeKanan = lineCapacityRange("targetKanan");
+    const lineCapacityRangeKiri = lineCapacityRange("targetKiri");
+
     const considerations = [];
 
     // Poin kritis (cutting & produksi) khusus untuk style ini.
@@ -225,6 +238,8 @@ export async function POST(req) {
         skillCategory,
         avgCuttingCapacityPerHour: cuttingCap.average,
         operatorCapacityRange,
+        lineCapacityRangeKanan,
+        lineCapacityRangeKiri,
         criticalPoints,
         optionsKananWomen,
         optionsKiri,
@@ -306,6 +321,8 @@ export async function POST(req) {
       skillCategory,
       avgCuttingCapacityPerHour: cuttingCap.average,
       operatorCapacityRange,
+      lineCapacityRangeKanan,
+      lineCapacityRangeKiri,
       criticalPoints,
       considerations,
     });
