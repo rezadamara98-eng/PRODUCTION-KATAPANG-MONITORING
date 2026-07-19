@@ -271,11 +271,11 @@ export default function CapacityPlanner() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 14 }}>
           <div>
             <label style={labelStyle}>Qty Kanan (pcs)</label>
-            <input type="number" value={qtyKanan} onChange={(e) => setQtyKanan(e.target.value)} placeholder="4000" style={inputStyle} />
+            <input type="number" value={qtyKanan} onChange={(e) => setQtyKanan(e.target.value)} placeholder="0" style={inputStyle} />
           </div>
           <div>
             <label style={labelStyle}>Qty Kiri (pcs)</label>
-            <input type="number" value={qtyKiri} onChange={(e) => setQtyKiri(e.target.value)} placeholder="4000" style={inputStyle} />
+            <input type="number" value={qtyKiri} onChange={(e) => setQtyKiri(e.target.value)} placeholder="0" style={inputStyle} />
           </div>
           <div>
             <label style={labelStyle}>Qty Women (pcs)</label>
