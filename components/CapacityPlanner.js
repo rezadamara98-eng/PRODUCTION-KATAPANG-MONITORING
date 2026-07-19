@@ -499,6 +499,43 @@ export default function CapacityPlanner() {
             </>
           )}
 
+          {(result.machineRequirement || result.refStyle) && (
+            <>
+              <GroupHeader>4. Kebutuhan Mesin (Line Sewing)</GroupHeader>
+              {result.machineRequirement ? (
+                <Panel style={{ marginBottom: 24 }}>
+                  <p style={{ fontSize: 12, color: "var(--text-faint)", margin: "0 0 10px" }}>
+                    {result.machineRequirement.style} &middot; total {result.machineRequirement.totalLines} line
+                  </p>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "var(--font-mono)", fontSize: 13 }}>
+                    <thead>
+                      <tr style={{ textAlign: "left", color: "var(--text-faint)" }}>
+                        <th style={{ padding: "6px 10px" }}>Jenis Mesin</th>
+                        <th style={{ padding: "6px 10px", textAlign: "right" }}>Per Line</th>
+                        <th style={{ padding: "6px 10px", textAlign: "right" }}>Total Line</th>
+                        <th style={{ padding: "6px 10px", textAlign: "right" }}>Kebutuhan</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {result.machineRequirement.items.map((m, i) => (
+                        <tr key={i} style={{ borderTop: "1px solid var(--steel)" }}>
+                          <td style={{ padding: "6px 10px" }}>{m.name}</td>
+                          <td style={{ padding: "6px 10px", textAlign: "right", color: "var(--text-muted)" }}>{m.perLine}</td>
+                          <td style={{ padding: "6px 10px", textAlign: "right", color: "var(--text-muted)" }}>{result.machineRequirement.totalLines}</td>
+                          <td style={{ padding: "6px 10px", textAlign: "right", fontWeight: 700, color: "var(--navy)" }}>{m.total}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </Panel>
+              ) : (
+                <p style={{ fontSize: 13, color: "var(--text-faint)", marginBottom: 24 }}>
+                  Data kebutuhan mesin untuk style ini belum tersedia di tab BASE DATA MACHINE REQUIRE.
+                </p>
+              )}
+            </>
+          )}
+
           {(result.simulationKananWomen?.length > 0 || result.simulationKiri?.length > 0) && (
             <Panel title="Simulasi Opsi Jumlah Line" style={{ marginBottom: 24 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>

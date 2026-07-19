@@ -9,6 +9,7 @@ import {
   getCriticalPointsForStyle,
   getGudangJadiMpRatios,
   getSupplyMpRatios,
+  getMachineRequirementForStyle,
 } from "@/lib/sheets";
 import { calculateWorkingCapacity } from "@/lib/dateUtils";
 
@@ -167,7 +168,7 @@ export async function POST(req) {
 
     const skillCategory = getSkillCategoryForStyle(style);
 
-    const [styleOptions, cuttingCap, operatorList, strongPointGroups, skillMatrikRows, supplyRatios, gudangJadiRatios] =
+    const [styleOptions, cuttingCap, operatorList, strongPointGroups, skillMatrikRows, supplyRatios, gudangJadiRatios, machineRequirementRow] =
       await Promise.all([
         getStrongPointStyleOptions(),
         getAverageSkillCuttingCapacity(skillCategory),
@@ -176,6 +177,7 @@ export async function POST(req) {
         getSkillMatrikCuttingData(),
         getSupplyMpRatios(style),
         getGudangJadiMpRatios(style),
+        getMachineRequirementForStyle(style),
       ]);
 
     const refStyle = styleOptions.find(
@@ -350,6 +352,30 @@ export async function POST(req) {
     const capacityPerOperator = cuttingCap.average * totalHours;
     const operatorsNeeded = capacityPerOperator > 0 ? Math.ceil(totalQty / capacityPerOperator) : null;
 
+    // Kebutuhan Mesin: total line sewing = Line Kanan+Women + Line Kiri (keduanya
+    // sama-sama line sewing fisik yang butuh mesin sendiri-sendiri), dikalikan
+    // kebutuhan mesin per 1 line dari tab BASE DATA MACHINE REQUIRE.
+    const totalLinesForMachine = (linesKananWomen || 0) + (linesKiri || 0);
+    const machineRequirement =
+      machineRequirementRow && totalLinesForMachine > 0
+        ? {
+            style: machineRequirementRow.style,
+            totalLines: totalLinesForMachine,
+            items: machineRequirementRow.machines.map((m) => ({
+              name: m.name,
+              perLine: m.qtyPerLine,
+              total: Math.ceil(m.qtyPerLine * totalLinesForMachine),
+            })),
+          }
+        : null;
+
+    if (!machineRequirementRow) {
+      considerations.push({
+        type: "info",
+        text: `Data kebutuhan mesin untuk style "${style}" belum ditemukan di tab BASE DATA MACHINE REQUIRE.`,
+      });
+    }
+
     const ratePerHour = totalQty / totalHours;
 
     // MP Gudang Jadi (dipertahankan untuk kompatibilitas kartu yang sudah ada).
@@ -443,6 +469,7 @@ export async function POST(req) {
       lineCapacityRangeKiri,
       gudangJadiMp,
       supplyMp,
+      machineRequirement,
       stationFlow,
       criticalPoints,
       considerations,
