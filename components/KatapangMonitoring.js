@@ -197,16 +197,22 @@ export default function KatapangMonitoring() {
         </Panel>
         <Panel title="Absensi Kemarin">
           <div style={{ height: 140 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={absensiChartData} dataKey="value" nameKey="name" outerRadius="80%" label={{ fontSize: 11 }}>
-                  {absensiChartData.map((_, i) => (
-                    <Cell key={i} fill={absensiColors[i % absensiColors.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
+            {absensiChartData.some((d) => d.value > 0) ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={absensiChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <XAxis dataKey="name" stroke="var(--text-faint)" fontSize={11} />
+                  <YAxis stroke="var(--text-faint)" fontSize={10} allowDecimals={false} />
+                  <Tooltip />
+                  <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                    {absensiChartData.map((_, i) => (
+                      <Cell key={i} fill={absensiColors[i % absensiColors.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <p style={{ color: "var(--text-faint)", fontSize: 13 }}>Tidak ada yang absen kemarin.</p>
+            )}
           </div>
         </Panel>
       </div>
