@@ -14,6 +14,7 @@ import {
   getRejectLineYesterday,
   getRejectLineHistory,
   getEffisiensiLineYesterday,
+  getEffisiensiLineHistory,
   getWipPresubAccessoriesSummary,
   getJamKerjaYesterday,
   getAbsensiYesterday,
@@ -164,9 +165,12 @@ const TOOLS = [
     },
   },
   {
-    name: "get_effisiensi_line_yesterday",
-    description: "Efisiensi (%) per Line Sewing kemarin.",
-    input_schema: { type: "object", properties: {} },
+    name: "get_effisiensi_line",
+    description: "Efisiensi (%) per Line Sewing per hari. Tanpa parameter = data kemarin saja (hari terakhir yang ada datanya, skip hari libur/kosong).",
+    input_schema: {
+      type: "object",
+      properties: { days: { type: "number", description: "Kalau diisi, ambil histori N hari terakhir yang ada datanya (bukan cuma kemarin) - mis. 7 untuk analisa 1 minggu" } },
+    },
   },
   {
     name: "get_wip_presub_accessories",
@@ -334,8 +338,8 @@ async function executeTool(name, input) {
       return input.days ? capRows(await getRepairLineHistory(input.days), 60) : await getRepairLineYesterday();
     case "get_reject_line":
       return input.days ? capRows(await getRejectLineHistory(input.days), 60) : await getRejectLineYesterday();
-    case "get_effisiensi_line_yesterday":
-      return await getEffisiensiLineYesterday();
+    case "get_effisiensi_line":
+      return input.days ? capRows(await getEffisiensiLineHistory(input.days), 60) : await getEffisiensiLineYesterday();
     case "get_wip_presub_accessories":
       return await getWipPresubAccessoriesSummary();
     case "get_jam_kerja_yesterday":
