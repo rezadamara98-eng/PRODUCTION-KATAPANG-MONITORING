@@ -8,6 +8,11 @@ import {
   getGudangJadiSummary,
   getGudangJadiData,
   getOutputLineYesterday,
+  getOutputLineHistory,
+  getRepairLineYesterday,
+  getRepairLineHistory,
+  getRejectLineYesterday,
+  getRejectLineHistory,
   getEffisiensiLineYesterday,
   getWipPresubAccessoriesSummary,
   getJamKerjaYesterday,
@@ -135,9 +140,28 @@ const TOOLS = [
     },
   },
   {
-    name: "get_output_line_yesterday",
-    description: "Output produksi per Line Sewing kemarin.",
-    input_schema: { type: "object", properties: {} },
+    name: "get_output_line",
+    description: "Output produksi per Line Sewing (K01, K02, dst) per hari. Tanpa parameter = data kemarin saja.",
+    input_schema: {
+      type: "object",
+      properties: { days: { type: "number", description: "Kalau diisi, ambil histori N hari terakhir (bukan cuma kemarin)" } },
+    },
+  },
+  {
+    name: "get_repair_line",
+    description: "Jumlah repair per Line Sewing (K01, K02, dst) per hari. Tanpa parameter = data kemarin saja.",
+    input_schema: {
+      type: "object",
+      properties: { days: { type: "number", description: "Kalau diisi, ambil histori N hari terakhir (bukan cuma kemarin)" } },
+    },
+  },
+  {
+    name: "get_reject_line",
+    description: "Jumlah reject per Line Sewing (K01, K02, dst) per hari. Tanpa parameter = data kemarin saja.",
+    input_schema: {
+      type: "object",
+      properties: { days: { type: "number", description: "Kalau diisi, ambil histori N hari terakhir (bukan cuma kemarin)" } },
+    },
   },
   {
     name: "get_effisiensi_line_yesterday",
@@ -304,8 +328,12 @@ async function executeTool(name, input) {
       }
       return capRows(rows, 150);
     }
-    case "get_output_line_yesterday":
-      return await getOutputLineYesterday();
+    case "get_output_line":
+      return input.days ? capRows(await getOutputLineHistory(input.days), 60) : await getOutputLineYesterday();
+    case "get_repair_line":
+      return input.days ? capRows(await getRepairLineHistory(input.days), 60) : await getRepairLineYesterday();
+    case "get_reject_line":
+      return input.days ? capRows(await getRejectLineHistory(input.days), 60) : await getRejectLineYesterday();
     case "get_effisiensi_line_yesterday":
       return await getEffisiensiLineYesterday();
     case "get_wip_presub_accessories":
