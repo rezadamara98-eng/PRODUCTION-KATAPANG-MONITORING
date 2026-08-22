@@ -33,6 +33,16 @@ import {
   getKebutuhanMpSupplyRows,
   getMachineRequirementRows,
   lookupGloveSerial,
+  getDetailDefectData,
+  getDefectParetoSummary,
+  getQcAkhirData,
+  getDowntimeMesinData,
+  getAvailabilityHarianData,
+  getAverageAvailability,
+  getMaterialWasteData,
+  getAverageMarkerEfficiency,
+  getDeliveryBuyerData,
+  getOnTimeDeliveryRate,
 } from "@/lib/sheets";
 
 export const dynamic = "force-dynamic";
@@ -296,6 +306,80 @@ const TOOLS = [
       required: ["serial1", "serial2"],
     },
   },
+
+  // -------------------------------------------------------------------------
+  // DATA BARU: Kualitas Detail, Downtime Mesin, Material & Waste, Delivery
+  // -------------------------------------------------------------------------
+  {
+    name: "get_detail_defect",
+    description: "Rincian jenis defect/reject per kejadian: tanggal, line, style, proses ditemukan (cutting/sewing/packing/final QC), jenis defect, jumlah pcs.",
+    input_schema: {
+      type: "object",
+      properties: {
+        style: { type: "string", description: "Filter nama style tertentu (opsional)" },
+        days: { type: "number", description: "Kalau diisi, ambil histori N hari terakhir (bukan semua data)" },
+      },
+    },
+  },
+  {
+    name: "get_defect_pareto_summary",
+    description: "Rekap total pcs defect per jenis (Pareto), diurutkan dari yang terbanyak - buat cari penyebab reject terbesar.",
+    input_schema: { type: "object", properties: {} },
+  },
+  {
+    name: "get_qc_akhir",
+    description: "Hasil inspeksi QC/AQL sebelum shipment per SPO: sample size, defect ditemukan, limit AQL, status Lolos/Reject.",
+    input_schema: {
+      type: "object",
+      properties: {
+        onlyReject: { type: "boolean", description: "Kalau true, cuma tampilkan SPO yang statusnya Reject" },
+      },
+    },
+  },
+  {
+    name: "get_downtime_mesin",
+    description: "Rincian downtime mesin/line per hari: jenis downtime (breakdown/setup/maintenance/tunggu bahan), durasi menit, keterangan.",
+    input_schema: {
+      type: "object",
+      properties: { days: { type: "number", description: "Jumlah hari terakhir, default semua data" } },
+    },
+  },
+  {
+    name: "get_average_availability",
+    description: "Rata-rata Availability mesin (%) dari seluruh histori Downtime Mesin yang ada - komponen dasar OEE.",
+    input_schema: { type: "object", properties: {} },
+  },
+  {
+    name: "get_material_waste",
+    description: "Pemakaian bahan baku (kulit/synthetic) vs standar per style per hari, waste, dan marker efficiency (%).",
+    input_schema: {
+      type: "object",
+      properties: { style: { type: "string", description: "Filter nama style tertentu (opsional)" } },
+    },
+  },
+  {
+    name: "get_average_marker_efficiency",
+    description: "Rata-rata marker efficiency (%) - makin mendekati 100% makin sedikit waste bahan. Bisa difilter per style.",
+    input_schema: {
+      type: "object",
+      properties: { style: { type: "string", description: "Filter nama style tertentu (opsional)" } },
+    },
+  },
+  {
+    name: "get_delivery_buyer",
+    description: "Ketepatan kirim per SPO ke buyer: qty order, tanggal komitmen vs tanggal kirim aktual, selisih hari, status On Time/Late.",
+    input_schema: {
+      type: "object",
+      properties: {
+        onlyLate: { type: "boolean", description: "Kalau true, cuma tampilkan SPO yang Late" },
+      },
+    },
+  },
+  {
+    name: "get_on_time_delivery_rate",
+    description: "Ringkasan On-Time Delivery: persentase tepat waktu, jumlah On Time, jumlah Late, total SPO.",
+    input_schema: { type: "object", properties: {} },
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -407,6 +491,43 @@ async function executeTool(name, input) {
     }
     case "lookup_glove_serial":
       return await lookupGloveSerial(input.serial1, input.serial2);
+
+    // -------------------------------------------------------------------
+    // DATA BARU: Kualitas Detail, Downtime Mesin, Material & Waste, Delivery
+    // -------------------------------------------------------------------
+    case "get_detail_defect": {
+      let rows = await getDetailDefectData();
+      if (input.style) rows = filterByStyle(rows, input.style);
+      return capRows(daysLimit(rows, "tanggal", input.days), 150);
+    }
+    case "get_defect_pareto_summary":
+      return capRows(await getDefectParetoSummary(), 50);
+    case "get_qc_akhir": {
+      let rows = await getQcAkhirData();
+      if (input.onlyReject) rows = rows.filter((r) => r.status.toLowerCase() === "reject");
+      return capRows(rows, 150);
+    }
+    case "get_downtime_mesin": {
+      const rows = await getDowntimeMesinData();
+      return capRows(daysLimit(rows, "tanggal", input.days), 150);
+    }
+    case "get_average_availability":
+      return { averageAvailability: await getAverageAvailability() };
+    case "get_material_waste": {
+      let rows = await getMaterialWasteData();
+      if (input.style) rows = filterByStyle(rows, input.style);
+      return capRows(rows, 150);
+    }
+    case "get_average_marker_efficiency":
+      return await getAverageMarkerEfficiency(input.style);
+    case "get_delivery_buyer": {
+      let rows = await getDeliveryBuyerData();
+      if (input.onlyLate) rows = rows.filter((r) => r.statusOtd.toLowerCase() === "late");
+      return capRows(rows, 150);
+    }
+    case "get_on_time_delivery_rate":
+      return await getOnTimeDeliveryRate();
+
     default:
       return { error: `Tool "${name}" tidak dikenal.` };
   }
@@ -445,6 +566,13 @@ mempersempit filter dan panggil ulang kalau data yang terpotong itu penting untu
 
 Untuk pertanyaan soal reject/traceability glove, pakai tool lookup_glove_serial atau kombinasi
 get_kode_operator_cutting + get_spo_track + get_skill_matrix_sewing.
+
+Kamu juga punya akses ke data yang lebih baru: detail jenis defect & hasil QC/AQL akhir
+(get_detail_defect, get_defect_pareto_summary, get_qc_akhir), downtime & availability mesin
+(get_downtime_mesin, get_average_availability), pemakaian bahan baku & marker efficiency
+(get_material_waste, get_average_marker_efficiency), dan ketepatan delivery ke buyer
+(get_delivery_buyer, get_on_time_delivery_rate). Pakai tools ini kalau user tanya soal
+penyebab reject, downtime mesin, waste bahan, atau keterlambatan kirim ke buyer.
 
 Jawab dengan bahasa Indonesia yang jelas dan langsung ke intinya. Kalau data yang ditanyakan
 memang belum tersedia di sheet manapun, katakan terus terang.`;
