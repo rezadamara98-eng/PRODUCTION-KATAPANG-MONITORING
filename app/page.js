@@ -5,6 +5,7 @@ import KatapangMonitoring from "@/components/KatapangMonitoring";
 import DashboardProduction from "@/components/DashboardProduction";
 import GloveTracking from "@/components/GloveTracking";
 import CapacityPlanner from "@/components/CapacityPlanner";
+import LineBalancing from "@/components/LineBalancing";
 import AsikSolution from "@/components/AsikSolution";
 import Logo from "@/components/Logo";
 
@@ -13,6 +14,7 @@ const TABS = [
   { key: "prod", label: "Dashboard Production" },
   { key: "glove", label: "Glove Tracking" },
   { key: "capacity", label: "Perencanaan Kapasitas" },
+  { key: "linebalancing", label: "Line Balancing" },
   { key: "asik", label: "ASIK Solution" },
 ];
 
@@ -103,6 +105,7 @@ export default function Home() {
       {active === "prod" && <DashboardProduction />}
       {active === "glove" && <GloveTracking />}
       {active === "capacity" && <CapacityPlanner />}
+      {active === "linebalancing" && <LineBalancing />}
       {active === "asik" && <AsikSolution />}
 
       <div

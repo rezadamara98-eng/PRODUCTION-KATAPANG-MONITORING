@@ -1,67 +1,43 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  PieChart,
-  Pie,
-  Cell,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from "recharts";
-import KpiCard from "./KpiCard";
-import Panel from "./Panel";
 import { getYesterdayRow } from "@/lib/dateUtils";
+import Gear from "./katapang/gear";
+import RadialGauge from "./katapang/RadialGauge";
+import Marquee from "./katapang/Marquee";
+import HudPanel from "./katapang/HudPanel";
+import KpiTile from "./katapang/KpiTile";
+import ShipmentChart from "./katapang/ShipmentChart";
+import JamKerjaChart from "./katapang/JamKerjaChart";
+import HudTheme from "./katapang/HudTheme";
 
 function safeFixed(val, digits = 1) {
   const n = Number(val);
-  return Number.isFinite(n) ? n.toFixed(digits) : "-";
+  return Number.isFinite(n) ? n.toFixed(digits) : null;
 }
 
-const NAVY = "#0a2647";
-const TEAL = "#3ab7c4";
-const GREEN = "#1a7a4c";
-const RED = "#c0392b";
-const AMBER = "#b3720f";
-const GRAY = "#c3cddc";
+// Achievement status: >=100% memenuhi target, >=90% mendekati, di bawah itu
+// perlu perhatian. Warna & label ikut status ini, bukan warna tetap per panel.
+function achievementStatus(value) {
+  if (!Number.isFinite(value) || value <= 0) return { tone: "dim", color: "#57616b", label: "NO DATA" };
+  if (value >= 100) return { tone: "good", color: "#0ca30c", label: "DI ATAS TARGET" };
+  if (value >= 90) return { tone: "warning", color: "#fab219", label: "MENDEKATI TARGET" };
+  return { tone: "critical", color: "#d03b3b", label: "PERLU PERHATIAN" };
+}
 
-function AchievementDonut({ value, color }) {
-  const v = Number.isFinite(value) ? Math.max(0, value) : 0;
-  const gap = Math.max(0, 100 - v);
-  const data = [
-    { name: "Tercapai", value: v },
-    { name: "Gap", value: gap },
-  ];
-  return (
-    <div style={{ position: "relative", height: 140 }}>
-      <ResponsiveContainer width="100%" height="100%">
-        <PieChart>
-          <Pie data={data} dataKey="value" innerRadius="65%" outerRadius="90%" startAngle={90} endAngle={-270}>
-            <Cell fill={color} />
-            <Cell fill={GRAY} />
-          </Pie>
-        </PieChart>
-      </ResponsiveContainer>
-      <div
-        style={{
-          position: "absolute",
-          top: "50%",
-          left: "50%",
-          transform: "translate(-50%, -50%)",
-          fontSize: 22,
-          fontWeight: 700,
-          color: "var(--navy)",
-          fontFamily: "var(--font-mono)",
-        }}
-      >
-        {safeFixed(v, 1)}%
-      </div>
-    </div>
-  );
+function LiveClock() {
+  const [time, setTime] = useState(null);
+  useEffect(() => {
+    const pad = (n) => String(n).padStart(2, "0");
+    const tick = () => {
+      const d = new Date();
+      setTime(`${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`);
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, []);
+  return <span id="k-clock">{time || "--:--:--"}</span>;
 }
 
 export default function KatapangMonitoring() {
@@ -108,8 +84,12 @@ export default function KatapangMonitoring() {
 
   if (loading) {
     return (
-      <div style={{ color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
-        Mengambil data dari Google Sheets...
+      <div className="k-root">
+        <KHudChrome />
+        <div style={{ position: "relative", zIndex: 2, padding: 40, fontFamily: "IBM Plex Mono, monospace", color: "#8b98a3" }}>
+          Mengambil data dari Google Sheets...
+        </div>
+        <HudTheme />
       </div>
     );
   }
@@ -133,164 +113,235 @@ export default function KatapangMonitoring() {
 
   const jamKerjaChartData = jamKerja
     ? [
-        { name: "Supply", SM: jamKerja.smSupply, Aktual: jamKerja.actualSupply },
-        { name: "Sewing", SM: jamKerja.smSewing, Aktual: jamKerja.actualSewing },
-        { name: "Gudang Jadi", SM: jamKerja.smGudangJadi, Aktual: jamKerja.actualGudangJadi },
-        { name: "Support", SM: jamKerja.smSupport, Aktual: jamKerja.actualSupport },
+        { name: "Supply", sm: jamKerja.smSupply ?? null, aktual: jamKerja.actualSupply || 0 },
+        { name: "Sewing", sm: jamKerja.smSewing ?? null, aktual: jamKerja.actualSewing || 0 },
+        { name: "Gudang Jadi", sm: jamKerja.smGudangJadi ?? null, aktual: jamKerja.actualGudangJadi || 0 },
+        { name: "Support", sm: jamKerja.smSupport ?? null, aktual: jamKerja.actualSupport || 0 },
       ]
     : [];
-  const hasJamKerjaData = jamKerjaChartData.some((d) => d.SM || d.Aktual);
+  const hasJamKerjaData = jamKerjaChartData.some((d) => d.sm || d.aktual);
+  const noTargetCount = jamKerjaChartData.filter((d) => !d.sm).length;
 
-  const absensiChartData = absensi.map((a) => ({ name: a.jenisAbsen, value: a.jumlah }));
-  const absensiColors = [GRAY, TEAL, AMBER, RED, NAVY];
+  const hasAbsensi = absensi.some((a) => a.jumlah > 0);
+  const totalAbsen = absensi.reduce((sum, a) => sum + (a.jumlah || 0), 0);
+
+  const sewStatus = achievementStatus(achievement?.achievementSewing);
+  const distStatus = achievementStatus(achievement?.achievementDistribusi);
+  const shortageCount = shipmentChartData.filter((d) => d.value < 0).length;
+
+  const paKpis = [
+    { label: "PA Supply", value: latestPa ? safeFixed(latestPa.supply, 2) : null },
+    { label: "PA Sewing", value: latestPa ? safeFixed(latestPa.sewing, 2) : null },
+    { label: "PA Gudang Jadi", value: latestPa ? safeFixed(latestPa.gudangJadi, 2) : null },
+    { label: "PA Factory", value: latestPa ? safeFixed(latestPa.factory, 2) : null },
+  ];
+  const wipKpis = [
+    { label: "WIP Sewing", value: wipSewingTotal.toLocaleString("id-ID"), unit: "pcs" },
+    { label: "WIP Distribusi", value: (wipSummary?.distribusi?.total ?? 0).toLocaleString("id-ID"), unit: "pcs" },
+    { label: "WIP Cutting Synthetic", value: (wipSummary?.cuttingSynthetic?.total ?? 0).toLocaleString("id-ID"), unit: "pcs" },
+    { label: "WIP Cutting Leather", value: (wipSummary?.cuttingKulit?.total ?? 0).toLocaleString("id-ID"), unit: "pcs" },
+  ];
 
   return (
-    <div>
-      {error && (
-        <div
-          style={{
-            background: "rgba(192,57,43,0.1)",
-            border: "1px solid var(--red)",
-            color: "var(--text)",
-            padding: "14px 18px",
-            marginBottom: 24,
-            fontSize: 14,
-          }}
-        >
-          <strong style={{ color: "var(--red)" }}>Gagal memuat data.</strong> {error}
+    <div className="k-root">
+      <KHudChrome />
+
+      <div style={{ position: "relative", zIndex: 2 }}>
+        <div className="k-topbar">
+          <div className="k-brand">
+            <div className="k-brand-mark">AS</div>
+            <div className="k-brand-gears">
+              <div style={{ position: "relative", width: 34, height: 30 }}>
+                <div style={{ position: "absolute", left: -3, top: 2 }}>
+                  <Gear teeth={10} rOuter={11} rBase={9} rBore={2.6} mode="fill" color="#2dd4bf" opacity={0.95} spin="cw" duration={6} />
+                </div>
+                <div style={{ position: "absolute", left: 15, top: 11 }}>
+                  <Gear teeth={8} rOuter={7.5} rBase={6} rBore={1.8} mode="fill" color="#57616b" opacity={0.9} spin="ccw" duration={4.8} />
+                </div>
+              </div>
+            </div>
+            <div className="k-brand-text">
+              <Marquee text="Katapang Monitoring" />
+              <div className="k-t2">Asiglove · Production Control</div>
+            </div>
+          </div>
+          <div className="k-sys-status">
+            <span>
+              <span className="k-dot-live" />
+              SYSTEM NOMINAL
+            </span>
+            <LiveClock />
+          </div>
         </div>
-      )}
 
-      <p
-        style={{
-          fontFamily: "var(--font-display)",
-          fontSize: 12,
-          letterSpacing: "0.1em",
-          color: "var(--text-faint)",
-          textTransform: "uppercase",
-          marginBottom: 10,
-        }}
-      >
-        PA per Departemen &amp; Total WIP {latestPa ? `- ${latestPa.tanggal}` : ""}
-      </p>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 10, marginBottom: 24 }}>
-        <KpiCard eyebrow="PA Supply" value={latestPa ? safeFixed(latestPa.supply, 2) : "-"} />
-        <KpiCard eyebrow="PA Sewing" value={latestPa ? safeFixed(latestPa.sewing, 2) : "-"} />
-        <KpiCard
-          eyebrow="PA Gudang Jadi"
-          value={latestPa ? safeFixed(latestPa.gudangJadi, 2) : "-"}
-          tone={latestPa && latestPa.gudangJadi >= 100 ? "green" : undefined}
-        />
-        <KpiCard eyebrow="PA Factory" value={latestPa ? safeFixed(latestPa.factory, 2) : "-"} />
-        <KpiCard eyebrow="WIP Sewing" value={wipSewingTotal.toLocaleString("id-ID")} unit="pcs" tone="green" />
-        <KpiCard eyebrow="WIP Distribusi" value={(wipSummary?.distribusi?.total ?? 0).toLocaleString("id-ID")} unit="pcs" />
-        <KpiCard eyebrow="WIP Cutting Synthetic" value={(wipSummary?.cuttingSynthetic?.total ?? 0).toLocaleString("id-ID")} unit="pcs" />
-        <KpiCard eyebrow="WIP Cutting Leather" value={(wipSummary?.cuttingKulit?.total ?? 0).toLocaleString("id-ID")} unit="pcs" />
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14, marginBottom: 24 }}>
-        <Panel title="Achievement Sewing">
-          <AchievementDonut value={achievement?.achievementSewing} color={AMBER} />
-        </Panel>
-        <Panel title="Achievement Distribusi">
-          <AchievementDonut value={achievement?.achievementDistribusi} color={GREEN} />
-        </Panel>
-        <Panel title="Absensi Kemarin">
-          <div style={{ height: 140 }}>
-            {absensiChartData.some((d) => d.value > 0) ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={absensiChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                  <XAxis dataKey="name" stroke="var(--text-faint)" fontSize={11} />
-                  <YAxis stroke="var(--text-faint)" fontSize={10} allowDecimals={false} />
-                  <Tooltip />
-                  <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                    {absensiChartData.map((_, i) => (
-                      <Cell key={i} fill={absensiColors[i % absensiColors.length]} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <p style={{ color: "var(--text-faint)", fontSize: 13 }}>Tidak ada yang absen kemarin.</p>
-            )}
+        {error && (
+          <div className="k-error">
+            <strong>Gagal memuat data.</strong> {error}
           </div>
-        </Panel>
-      </div>
+        )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14, marginBottom: 14 }}>
-        <Panel title="Monitoring Shipment">
-          <div style={{ height: 200 }}>
-            {hasShipmentData ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={shipmentChartData} layout="vertical" margin={{ left: 20 }}>
-                  <XAxis type="number" stroke="var(--text-faint)" fontSize={10} />
-                  <YAxis type="category" dataKey="name" stroke="var(--text-faint)" fontSize={10} width={120} />
-                  <Tooltip />
-                  <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                    {shipmentChartData.map((d, i) => (
-                      <Cell key={i} fill={d.value < 0 ? RED : TEAL} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <p style={{ color: "var(--text-faint)", fontSize: 13 }}>Belum ada data.</p>
-            )}
+        <div className="k-section-title k-section-title-wrap">
+          <div className="k-section-gear">
+            <Gear teeth={16} rOuter={70} rBase={61} rBore={16} mode="stroke" color="#2dd4bf" strokeWidth={1.6} opacity={0.12} spin="cw" duration={90} />
           </div>
-        </Panel>
-        <Panel title="Jam Kerja: SM vs Aktual">
-          <div style={{ height: 200 }}>
+          <h2>PA per Departemen &amp; Total WIP</h2>
+          <div className="k-sub">{latestPa ? `READOUT — ${latestPa.tanggal}` : "READOUT"}</div>
+        </div>
+
+        <div className="k-kpi-grid">
+          {paKpis.map((k) => (
+            <KpiTile key={k.label} label={k.label} value={k.value} hasData={k.value !== null} foot="belum ada input hari ini" />
+          ))}
+          {wipKpis.map((k) => (
+            <KpiTile key={k.label} label={k.label} value={k.value} unit={k.unit} hasData foot="work in process" />
+          ))}
+        </div>
+
+        <div className="k-row k-row-three">
+          <HudPanel title="Achievement Sewing" tag={sewStatus.label} tagTone={sewStatus.tone}>
+            <div className="k-gauge-wrap">
+              <RadialGauge pct={achievement?.achievementSewing} color={sewStatus.color} />
+              <div className="k-gauge-figures">
+                <div className="k-gauge-pct">{safeFixed(achievement?.achievementSewing, 1) ?? "-"}%</div>
+                <div className="k-gauge-target">vs target 100%</div>
+              </div>
+            </div>
+          </HudPanel>
+          <HudPanel title="Achievement Distribusi" tag={distStatus.label} tagTone={distStatus.tone}>
+            <div className="k-gauge-wrap">
+              <RadialGauge pct={achievement?.achievementDistribusi} color={distStatus.color} />
+              <div className="k-gauge-figures">
+                <div className="k-gauge-pct">{safeFixed(achievement?.achievementDistribusi, 1) ?? "-"}%</div>
+                <div className="k-gauge-target">vs target 100%</div>
+              </div>
+            </div>
+          </HudPanel>
+          <HudPanel title="Absensi Kemarin" tag={hasAbsensi ? `${totalAbsen} ABSEN` : "NIHIL"} tagTone={hasAbsensi ? "warning" : "good"}>
+            {hasAbsensi ? (
+              <div className="k-absensi-list">
+                {absensi.filter((a) => a.jumlah > 0).map((a) => (
+                  <div key={a.jenisAbsen} className="k-absensi-row">
+                    <span>{a.jenisAbsen}</span>
+                    <span className="k-absensi-count">{a.jumlah}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="k-absensi-body">
+                <div className="k-absensi-icon">OK</div>
+                <div className="k-absensi-text">
+                  <div className="k-l1">Semua hadir</div>
+                  <div className="k-l2">Tidak ada yang absen kemarin</div>
+                </div>
+              </div>
+            )}
+          </HudPanel>
+        </div>
+
+        <div className="k-row k-row-two">
+          <HudPanel
+            title="Monitoring Shipment"
+            tag={hasShipmentData ? (shortageCount > 0 ? `${shortageCount} KEKURANGAN` : "AMAN") : "BELUM ADA DATA"}
+            tagTone={hasShipmentData ? (shortageCount > 0 ? "critical" : "good") : "dim"}
+          >
+            {hasShipmentData ? <ShipmentChart data={shipmentChartData} /> : <p className="k-empty">Belum ada data.</p>}
+          </HudPanel>
+          <HudPanel
+            title="Jam Kerja: SM vs Aktual"
+            tag={hasJamKerjaData ? (noTargetCount > 0 ? `${noTargetCount} TANPA TARGET` : "LENGKAP") : "BELUM ADA DATA"}
+            tagTone={hasJamKerjaData ? (noTargetCount > 0 ? "warning" : "good") : "dim"}
+          >
             {hasJamKerjaData ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={jamKerjaChartData}>
-                  <XAxis dataKey="name" stroke="var(--text-faint)" fontSize={10} />
-                  <YAxis stroke="var(--text-faint)" fontSize={10} />
-                  <Tooltip />
-                  <Legend wrapperStyle={{ fontSize: 10 }} />
-                  <Bar dataKey="SM" fill={GRAY} radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="Aktual" fill={TEAL} radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <>
+                <JamKerjaChart data={jamKerjaChartData} />
+                <div className="k-legend">
+                  <span>
+                    <i className="k-legend-ghost" />
+                    SM (target)
+                  </span>
+                  <span>
+                    <i style={{ background: "#3987e5" }} />
+                    Supply
+                  </span>
+                  <span>
+                    <i style={{ background: "#d95926" }} />
+                    Sewing
+                  </span>
+                  <span>
+                    <i style={{ background: "#199e70" }} />
+                    Gudang Jadi
+                  </span>
+                  <span>
+                    <i style={{ background: "#d55181" }} />
+                    Support
+                  </span>
+                </div>
+              </>
             ) : (
-              <p style={{ color: "var(--text-faint)", fontSize: 13 }}>Belum ada data.</p>
+              <p className="k-empty">Belum ada data.</p>
             )}
+          </HudPanel>
+        </div>
+
+        <HudPanel title="Detail SPO Kekurangan Produksi & Envelope" tag={`${(achievement?.shipmentDetail || []).length} SPO`} tagTone="warning">
+          <div className="k-table-wrap">
+            <table className="k-table">
+              <thead>
+                <tr>
+                  <th>SPO</th>
+                  <th>Product</th>
+                  <th className="k-num">Kekurangan Produksi</th>
+                  <th className="k-num">Kekurangan Envelope</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(achievement?.shipmentDetail || []).map((d, i) => (
+                  <tr key={i}>
+                    <td>{d.spo}</td>
+                    <td className="k-muted">{d.style}</td>
+                    <td className={`k-num ${d.kekuranganProduksi < 0 ? "k-neg" : ""}`}>{d.kekuranganProduksi.toLocaleString("id-ID")}</td>
+                    <td className={`k-num ${d.kekuranganEnvelope < 0 ? "k-neg" : ""}`}>{d.kekuranganEnvelope.toLocaleString("id-ID")}</td>
+                  </tr>
+                ))}
+                {(achievement?.shipmentDetail || []).length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="k-empty-row">
+                      Tidak ada SPO yang kekurangan produksi/envelope saat ini.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
-        </Panel>
+        </HudPanel>
+
+        <footer className="k-footer">
+          <span className="k-footer-brand">
+            <Gear teeth={8} rOuter={8} rBase={6.4} rBore={2} mode="stroke" color="#57616b" strokeWidth={1.4} opacity={0.8} />
+            ASIK CONTROL LAYER
+          </span>
+          <span>READOUT REFRESH ON LOAD</span>
+        </footer>
       </div>
 
-      <Panel title="Detail SPO Kekurangan Produksi &amp; Envelope">
-        <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "var(--font-mono)", fontSize: 13 }}>
-          <thead>
-            <tr style={{ textAlign: "left", color: "var(--text-faint)" }}>
-              <th style={{ padding: "6px 10px" }}>SPO</th>
-              <th style={{ padding: "6px 10px" }}>Product</th>
-              <th style={{ padding: "6px 10px", textAlign: "right" }}>Kekurangan Produksi</th>
-              <th style={{ padding: "6px 10px", textAlign: "right" }}>Kekurangan Envelope</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(achievement?.shipmentDetail || []).map((d, i) => (
-              <tr key={i} style={{ borderTop: "1px solid var(--steel)" }}>
-                <td style={{ padding: "6px 10px" }}>{d.spo}</td>
-                <td style={{ padding: "6px 10px", color: "var(--text-muted)" }}>{d.style}</td>
-                <td style={{ padding: "6px 10px", textAlign: "right", color: d.kekuranganProduksi < 0 ? "var(--red)" : "var(--text)" }}>
-                  {d.kekuranganProduksi.toLocaleString("id-ID")}
-                </td>
-                <td style={{ padding: "6px 10px", textAlign: "right", color: d.kekuranganEnvelope < 0 ? "var(--red)" : "var(--text)" }}>
-                  {d.kekuranganEnvelope.toLocaleString("id-ID")}
-                </td>
-              </tr>
-            ))}
-            {(achievement?.shipmentDetail || []).length === 0 && (
-              <tr>
-                <td colSpan={4} style={{ padding: "12px 10px", color: "var(--text-faint)" }}>
-                  Tidak ada SPO yang kekurangan produksi/envelope saat ini.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </Panel>
+      <HudTheme />
     </div>
   );
 }
+
+function KHudChrome() {
+  return (
+    <>
+      <div className="k-scanlines" />
+      <div className="k-bg-gears">
+        <div style={{ position: "absolute", top: -90, right: -70 }}>
+          <Gear teeth={20} rOuter={210} rBase={186} rBore={46} mode="stroke" color="#2dd4bf" strokeWidth={2} opacity={0.05} spin="cw" duration={150} />
+        </div>
+        <div style={{ position: "absolute", top: 120, right: 220 }}>
+          <Gear teeth={13} rOuter={120} rBase={104} rBore={26} mode="stroke" color="#d95926" strokeWidth={2} opacity={0.045} spin="ccw" duration={100} />
+        </div>
+      </div>
+    </>
+  );
+}
+
