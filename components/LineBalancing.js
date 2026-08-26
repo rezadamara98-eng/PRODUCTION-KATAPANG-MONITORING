@@ -1,41 +1,86 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import Gear from "./katapang/gear";
 import HudPanel from "./katapang/HudPanel";
 import KpiTile from "./katapang/KpiTile";
 import CycleTimeChart from "./katapang/CycleTimeChart";
 import HudTheme from "./katapang/HudTheme";
+import { computeSummary, buildSuggestions } from "@/lib/lineBalancing";
 
 // ---------------------------------------------------------------------------
-// CONTOH DATA — belum terhubung ke Google Sheets.
-// Tab "Line Balancing" di spreadsheet sumber belum di-export/dipelajari
-// strukturnya (nama tab, nama kolom persis) sehingga fungsi pengambilan data
-// (lib/sheets.js) sengaja belum ditulis di sini - risikonya sama seperti kasus
-// header "prosesditemukan" sebelumnya: menebak nama kolom akan mudah salah dan
-// diam-diam mengembalikan data kosong. Begitu file CSV/Excel tab ini dikirim,
-// bagian ini tinggal diganti dengan fetch("/api/line-balancing").
+// Kalkulator interaktif, bukan dashboard yang baca Google Sheets: leader
+// input cycle time hasil pengamatan langsung di sini, sesuai keputusan
+// (tujuannya membantu leader menghitung target line dari kondisi aktual di
+// lapangan). Tidak ada penyimpanan otomatis - semua state hilang saat
+// halaman di-refresh, seperti kalkulator kertas biasa.
+//
+// Seed di bawah = contoh nyata Line K04 / style Tour Authentic 2025 yang
+// dikirim sebagai referensi, supaya angka kalkulator ini bisa langsung
+// dicocokkan dengan catatan manual sebelum dipakai leader lain.
 // ---------------------------------------------------------------------------
-const SAMPLE_STATIONS = [
-  { station: "Cutting Prep", operator: "OP-01", cycleTime: 38 },
-  { station: "Jahit Palm", operator: "OP-02", cycleTime: 45 },
-  { station: "Jahit Back", operator: "OP-03", cycleTime: 41 },
-  { station: "Jahit Thumb", operator: "OP-04", cycleTime: 52 },
-  { station: "Fourchette", operator: "OP-05", cycleTime: 47 },
-  { station: "Overlock", operator: "OP-06", cycleTime: 39 },
-  { station: "Welting", operator: "OP-07", cycleTime: 36 },
-  { station: "Trimming & QC", operator: "OP-08", cycleTime: 33 },
+const SEED_ROWS = [
+  { id: 1, noProses: "S-1", proses: "SUPPLY SET", nik: "D.15511", operator: "TITIN FURWANTI", cycleTime: 13.73, allowance: 11 },
+  { id: 2, noProses: "S-2", proses: "J. ELASTIC TAB + J. E", nik: "D.13523", operator: "M. SOLIHIN", cycleTime: 27.97, allowance: 11 },
+  { id: 3, noProses: "S-3", proses: "J. IBU JARI", nik: "D.12532", operator: "YAYAN", cycleTime: 46.6, allowance: 11 },
+  { id: 4, noProses: "S-3", proses: "J. IBU JARI", nik: "D.11578", operator: "AKBAR", cycleTime: 52.49, allowance: 11 },
+  { id: 5, noProses: "S-4", proses: "J. TUTUP IBU JARI", nik: "D.13770", operator: "KURNIAWAN", cycleTime: 25.51, allowance: 11 },
+  { id: 6, noProses: "S-5", proses: "J. MACHI", nik: "D.11869", operator: "DEDE S", cycleTime: 58.18, allowance: 11 },
+  { id: 7, noProses: "S-5", proses: "J. MACHI", nik: "D.09790", operator: "JOKO ARI SETIAWAN", cycleTime: 62.38, allowance: 11 },
+  { id: 8, noProses: "S-5", proses: "J. MACHI", nik: "D.12451", operator: "NUNUNG KUSNIDAR", cycleTime: 79.46, allowance: 11 },
+  { id: 9, noProses: "S-6", proses: "CARAHA", nik: "D.13444", operator: "NALA", cycleTime: 22.41, allowance: 11 },
+  { id: 10, noProses: "S-7", proses: "J. LIPAT", nik: "D.12568", operator: "ANDRI MULYANA", cycleTime: 68.82, allowance: 11 },
+  { id: 11, noProses: "S-7", proses: "J. LIPAT", nik: "D.10275", operator: "DUDI HAMZAH", cycleTime: 73.5, allowance: 11 },
+  { id: 12, noProses: "S-7", proses: "J. LIPAT", nik: "D.11655", operator: "SYARIF FATONI", cycleTime: 66.11, allowance: 11 },
+  { id: 13, noProses: "S-8", proses: "J. PASANG TERRYBA", nik: "D.16405", operator: "CHANDRA ANUGRAH SUG", cycleTime: 22.7, allowance: 11 },
+  { id: 14, noProses: "S-9", proses: "J. ELASTIC WRIST", nik: "D.12537", operator: "RUDI", cycleTime: 17.6, allowance: 11 },
+  { id: 15, noProses: "S-10", proses: "J. PULLER", nik: "D.15079", operator: "ERIANSYAH", cycleTime: 19.03, allowance: 11 },
+  { id: 16, noProses: "S-11", proses: "J. MAJIK HALUS", nik: "D.14449", operator: "DIMAS AKBARSYAH", cycleTime: 22.81, allowance: 11 },
+  { id: 17, noProses: "S-12", proses: "J. PITA LOV", nik: "D.13159", operator: "MUHAMMAD RIZKI DARM", cycleTime: 20.86, allowance: 11 },
+  { id: 18, noProses: "S-13", proses: "TRIMMING BODY BE", nik: "D.11826", operator: "CITRA", cycleTime: 29.2, allowance: 11 },
 ];
-const SAMPLE_TAKT_TIME = 42;
+
+const fmt1 = (n) => (Number.isFinite(n) ? n.toFixed(1) : "-");
+const fmt0 = (n) => (Number.isFinite(n) ? Math.round(n).toLocaleString("id-ID") : "-");
+const fmt2 = (n) => (Number.isFinite(n) ? n.toFixed(2) : "-");
+const truncate = (s, n) => (String(s).length > n ? String(s).slice(0, n - 1) + "…" : String(s));
 
 export default function LineBalancing() {
-  const stations = SAMPLE_STATIONS;
-  const taktTime = SAMPLE_TAKT_TIME;
+  const [rows, setRows] = useState(SEED_ROWS);
+  const [nextId, setNextId] = useState(19);
+  const [lineName, setLineName] = useState("K04");
+  const [styleName, setStyleName] = useState("TOUR AUTHENTIC 2025");
+  const [workMinutes, setWorkMinutes] = useState(420);
+  const [workPerHour, setWorkPerHour] = useState(60);
+  const [targetOutput, setTargetOutput] = useState("");
 
-  const totalCycle = stations.reduce((sum, s) => sum + s.cycleTime, 0);
-  const avgCycle = totalCycle / stations.length;
-  const bottleneck = stations.reduce((max, s) => (s.cycleTime > max.cycleTime ? s : max), stations[0]);
-  const lineEfficiency = (totalCycle / (stations.length * bottleneck.cycleTime)) * 100;
-  const bottleneckCount = stations.filter((s) => s.cycleTime > taktTime).length;
+  const summary = useMemo(
+    () =>
+      computeSummary({
+        rows,
+        workPerHour: parseFloat(workPerHour) || 60,
+        workMinutes: parseFloat(workMinutes) || 0,
+        targetOutput: targetOutput === "" ? null : parseFloat(targetOutput),
+      }),
+    [rows, workPerHour, workMinutes, targetOutput]
+  );
+
+  const suggestions = summary ? buildSuggestions(summary.groups, summary.referenceTakt) : [];
+
+  function updateRow(id, field, value) {
+    setRows((prev) =>
+      prev.map((r) =>
+        r.id === id ? { ...r, [field]: field === "cycleTime" || field === "allowance" ? parseFloat(value) || 0 : value } : r
+      )
+    );
+  }
+  function removeRow(id) {
+    setRows((prev) => prev.filter((r) => r.id !== id));
+  }
+  function addRow() {
+    setRows((prev) => [...prev, { id: nextId, noProses: "", proses: "Proses Baru", nik: "", operator: "", cycleTime: 20, allowance: 11 }]);
+    setNextId((n) => n + 1);
+  }
 
   return (
     <div className="k-root">
@@ -54,98 +99,297 @@ export default function LineBalancing() {
             </div>
             <div className="k-brand-text">
               <div style={{ fontFamily: "Rajdhani, sans-serif", fontWeight: 700, fontSize: 18, letterSpacing: ".06em", textTransform: "uppercase" }}>
-                Line Balancing
+                Line Balancing Calculator
               </div>
-              <div className="k-t2">Cycle Time per Station · Sewing Line</div>
+              <div className="k-t2">Bantu leader hitung target line dari kondisi aktual</div>
             </div>
           </div>
           <div className="k-sys-status">
-            <span className="k-sample-badge">CONTOH DATA — MENUNGGU STRUKTUR SHEET ASLI</span>
+            <span className="k-tag k-tag-good">KALKULATOR INTERAKTIF · TIDAK TERSIMPAN OTOMATIS</span>
           </div>
         </div>
 
         <div className="k-section-title">
-          <h2>Ringkasan Line Balancing</h2>
-          <div className="k-sub">ILUSTRASI · 8 STATION</div>
+          <h2>Parameter Line</h2>
+          <div className="k-sub">DIISI LEADER</div>
         </div>
-
-        <div className="k-kpi-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
-          <KpiTile label="Takt Time" value={taktTime} unit="detik" hasData foot="target waktu per unit" />
-          <KpiTile label="Rata-rata Cycle Time" value={avgCycle.toFixed(1)} unit="detik" hasData foot={`dari ${stations.length} station`} />
-          <KpiTile label="Bottleneck Station" value={bottleneck.station} hasData foot={`${bottleneck.cycleTime} detik · ${bottleneck.operator}`} />
-          <KpiTile label="Line Efficiency" value={lineEfficiency.toFixed(1)} unit="%" hasData foot="ΣCT ÷ (N × CT maks)" />
-        </div>
-
-        <div className="k-row k-row-two" style={{ gridTemplateColumns: "1fr" }}>
-          <HudPanel
-            title="Cycle Time per Station"
-            tag={bottleneckCount > 0 ? `${bottleneckCount} DI ATAS TAKT TIME` : "SEIMBANG"}
-            tagTone={bottleneckCount > 0 ? "critical" : "good"}
-          >
-            <CycleTimeChart data={stations} taktTime={taktTime} />
-          </HudPanel>
-        </div>
-
-        <HudPanel title="Detail Station" tag={`${stations.length} STATION`} tagTone="dim">
-          <div className="k-table-wrap">
-            <table className="k-table">
-              <thead>
-                <tr>
-                  <th>Station</th>
-                  <th>Operator</th>
-                  <th className="k-num">Cycle Time (detik)</th>
-                  <th className="k-num">Selisih vs Takt</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {stations.map((s) => {
-                  const diff = s.cycleTime - taktTime;
-                  const isBottleneck = s.cycleTime > taktTime;
-                  return (
-                    <tr key={s.station}>
-                      <td>{s.station}</td>
-                      <td className="k-muted">{s.operator}</td>
-                      <td className="k-num">{s.cycleTime}</td>
-                      <td className={`k-num ${isBottleneck ? "k-neg" : ""}`}>
-                        {diff > 0 ? "+" : ""}
-                        {diff}
-                      </td>
-                      <td>
-                        <span className={`k-tag ${isBottleneck ? "k-tag-critical" : "k-tag-good"}`}>
-                          {isBottleneck ? "BOTTLENECK" : "OK"}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+        <div className="k-panel">
+          <div className="k-panel-body k-param-row">
+            <div className="k-field" style={{ width: 110 }}>
+              <label>Line</label>
+              <input className="k-input" type="text" value={lineName} onChange={(e) => setLineName(e.target.value)} />
+            </div>
+            <div className="k-field" style={{ width: 210 }}>
+              <label>Style</label>
+              <input className="k-input" type="text" value={styleName} onChange={(e) => setStyleName(e.target.value)} />
+            </div>
+            <div className="k-field" style={{ width: 150 }}>
+              <label>Waktu Kerja Tersedia</label>
+              <input className="k-input" type="number" min="1" value={workMinutes} onChange={(e) => setWorkMinutes(e.target.value)} />
+              <span className="k-hint">menit / shift</span>
+            </div>
+            <div className="k-field" style={{ width: 130 }}>
+              <label>Waktu Kerja / Jam</label>
+              <input className="k-input" type="number" min="1" value={workPerHour} onChange={(e) => setWorkPerHour(e.target.value)} />
+              <span className="k-hint">menit — konversi detik→menit</span>
+            </div>
+            <div className="k-field" style={{ width: 170 }}>
+              <label>Target Output (opsional)</label>
+              <input
+                className="k-input"
+                type="number"
+                min="0"
+                placeholder="mis. 480"
+                value={targetOutput}
+                onChange={(e) => setTargetOutput(e.target.value)}
+              />
+              <span className="k-hint">pcs / shift — kosongkan jika belum ada target</span>
+            </div>
           </div>
-        </HudPanel>
+        </div>
+
+        <div className="k-section-title">
+          <h2>Data Cycle Time per Proses</h2>
+          <div className="k-sub">{rows.length} BARIS</div>
+        </div>
+        <div className="k-panel">
+          <div className="k-panel-body">
+            <div className="k-panel-note">
+              <b>No. Proses</b> = urutan alur kerja yang wajib diikuti (tidak boleh dilewati/dibalik). Jika ada &ge;2 baris
+              dengan <b>No. Proses yang sama</b>, itu berarti proses tersebut dikerjakan oleh &gt;1 operator paralel untuk
+              memenuhi kapasitas — baris-baris itu otomatis <b>digabung jadi satu station</b> di bawah. Kolom{" "}
+              <b>CT (menit)</b> dan <b>SMV (menit)</b> dihitung otomatis dari Cycle Time × (1 + Allowance%), tidak perlu
+              diisi manual.
+            </div>
+            <div className="k-table-wrap">
+              <table className="k-table k-lb-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: "8%" }}>No. Proses</th>
+                    <th style={{ width: "19%" }}>Proses</th>
+                    <th style={{ width: "10%" }}>NIK</th>
+                    <th style={{ width: "15%" }}>Operator</th>
+                    <th style={{ width: "10%" }}>Cycle Time (detik)</th>
+                    <th style={{ width: "8%" }}>Allowance (%)</th>
+                    <th style={{ width: "9%" }}>CT (menit)</th>
+                    <th style={{ width: "9%" }}>SMV (menit)</th>
+                    <th style={{ width: "6%" }}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r) => {
+                    const workPerHourNum = parseFloat(workPerHour) || 60;
+                    const adjCT = r.cycleTime * (1 + (r.allowance || 0) / 100);
+                    const ctMin = workPerHourNum > 0 ? adjCT / workPerHourNum : 0;
+                    const smv = Math.ceil(ctMin * 100) / 100;
+                    return (
+                      <tr key={r.id}>
+                        <td>
+                          <input className="k-input k-narrow" type="text" placeholder="S-1" value={r.noProses} onChange={(e) => updateRow(r.id, "noProses", e.target.value)} />
+                        </td>
+                        <td>
+                          <input className="k-input" type="text" placeholder="Nama proses" value={r.proses} onChange={(e) => updateRow(r.id, "proses", e.target.value)} />
+                        </td>
+                        <td>
+                          <input className="k-input" type="text" placeholder="NIK" value={r.nik} onChange={(e) => updateRow(r.id, "nik", e.target.value)} />
+                        </td>
+                        <td>
+                          <input className="k-input" type="text" placeholder="Operator" value={r.operator} onChange={(e) => updateRow(r.id, "operator", e.target.value)} />
+                        </td>
+                        <td>
+                          <input className="k-input k-narrow" type="number" min="0" step="0.01" value={r.cycleTime} onChange={(e) => updateRow(r.id, "cycleTime", e.target.value)} />
+                        </td>
+                        <td>
+                          <input className="k-input k-narrow" type="number" min="0" step="0.5" value={r.allowance} onChange={(e) => updateRow(r.id, "allowance", e.target.value)} />
+                        </td>
+                        <td className="k-computed">{fmt2(ctMin)}</td>
+                        <td className="k-computed">{fmt2(smv)}</td>
+                        <td className="k-row-actions">
+                          <button className="k-icon-btn" title="Hapus baris" onClick={() => removeRow(r.id)}>
+                            ✕
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <button className="k-add-row-btn" onClick={addRow}>
+              + Tambah Baris
+            </button>
+          </div>
+        </div>
+
+        {!summary ? (
+          <div className="k-empty" style={{ padding: "20px 4px" }}>
+            Tambahkan minimal 1 baris dengan nama proses dan cycle time untuk mulai hitung.
+          </div>
+        ) : (
+          <>
+            <div className="k-kpi-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
+              <KpiTile
+                label="Bottleneck Station"
+                value={`${summary.bottleneck.noProses} · ${truncate(summary.bottleneck.proses, 16)}`}
+                hasData
+                foot={`${fmt1(summary.bottleneck.effectiveCT)} detik efektif · ${summary.bottleneck.operatorCount} operator (${truncate(summary.bottleneck.operatorNames.join(", "), 22)})`}
+              />
+              <KpiTile
+                label="Line Efficiency (saat ini)"
+                value={fmt1(summary.lineEfficiency)}
+                unit="%"
+                hasData
+                foot="ΣCT efektif ÷ (N × CT maks)"
+              />
+              <KpiTile
+                label="Output Tercapai"
+                value={fmt0(summary.currentOutputShift)}
+                unit="pcs/shift"
+                hasData
+                foot={`≈ ${fmt1(summary.currentOutputHour)} pcs/jam, dari bottleneck saat ini`}
+              />
+              <KpiTile
+                label="Jumlah Station"
+                value={fmt0(summary.n)}
+                unit="proses"
+                hasData
+                foot={`total ${summary.totalOperatorsAssigned} operator terisi`}
+              />
+              {summary.requiredTakt ? (
+                <>
+                  <KpiTile
+                    label="Takt Time Dibutuhkan"
+                    value={fmt1(summary.requiredTakt)}
+                    unit="detik"
+                    hasData
+                    foot={`untuk capai ${fmt0(parseFloat(targetOutput))} pcs/shift`}
+                  />
+                  <KpiTile
+                    label="Total Operator Dibutuhkan"
+                    value={fmt0(summary.totalOperatorsNeeded)}
+                    unit="orang"
+                    hasData
+                    foot={`saat ini ${summary.totalOperatorsAssigned} operator`}
+                  />
+                </>
+              ) : (
+                <KpiTile label="Rata-rata CT Efektif" value={fmt1(summary.avgCT)} unit="detik" hasData foot={`dari ${summary.n} station`} />
+              )}
+            </div>
+
+            <div className="k-row k-row-two" style={{ gridTemplateColumns: "1fr" }}>
+              <HudPanel
+                title="Cycle Time Efektif per Station"
+                tag={
+                  summary.groups.filter(summary.isOverTakt).length > 0
+                    ? `${summary.groups.filter(summary.isOverTakt).length} DI ATAS TAKT`
+                    : "SEIMBANG"
+                }
+                tagTone={summary.groups.filter(summary.isOverTakt).length > 0 ? "critical" : "good"}
+              >
+                <CycleTimeChart groups={summary.groups} taktTime={summary.referenceTakt} isOverTakt={summary.isOverTakt} />
+                <div className="k-legend">
+                  <span>
+                    <i style={{ background: "#2dd4bf" }} />
+                    Dalam takt
+                  </span>
+                  <span>
+                    <i style={{ background: "#d03b3b" }} />
+                    Di atas takt (bottleneck)
+                  </span>
+                  <span>
+                    <i className="k-legend-ghost" />
+                    Garis takt time acuan
+                  </span>
+                </div>
+              </HudPanel>
+            </div>
+
+            <HudPanel title="Saran Redistribusi Kerja" tag="ESTIMASI OTOMATIS" tagTone="warning">
+              <div className="k-panel-note">
+                No. Proses menandakan urutan alur yang wajib diikuti — saran di bawah hanya menambah/mengurangi{" "}
+                <b>jumlah operator</b> di proses yang sama, bukan mengubah urutan proses.
+              </div>
+              {suggestions.length === 0 ? (
+                <div className="k-empty">Line sudah cukup seimbang — tidak ada station yang jauh di atas atau di bawah acuan takt time saat ini.</div>
+              ) : (
+                suggestions.map((it) => (
+                  <div className="k-suggestion" key={it.key}>
+                    <span className={`k-suggestion-dot ${it.type}`} />
+                    <span className="k-suggestion-txt">
+                      <span dangerouslySetInnerHTML={{ __html: it.html }} />
+                      <span className="k-suggestion-caveat">
+                        Estimasi otomatis dari angka cycle time — leader tetap perlu cek kelayakan teknis (skill, mesin, tata letak) sebelum diterapkan.
+                      </span>
+                    </span>
+                  </div>
+                ))
+              )}
+            </HudPanel>
+
+            <HudPanel title="Ringkasan per Station (No. Proses)" tag={`${summary.n} STATION`} tagTone="dim">
+              <div className="k-table-wrap">
+                <table className="k-table k-lb-table">
+                  <thead>
+                    <tr>
+                      <th>No. Proses</th>
+                      <th>Proses</th>
+                      <th>Operator</th>
+                      <th className="k-num">Jml Operator</th>
+                      <th className="k-num">CT Efektif</th>
+                      <th className="k-num">Selisih vs Takt</th>
+                      <th className="k-num">Operator: Saat Ini → Dibutuhkan</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {summary.groups.map((g) => {
+                      const diff = g.effectiveCT - summary.referenceTakt;
+                      const isBottleneck = summary.isOverTakt(g);
+                      const needed = summary.requiredTakt ? Math.max(1, Math.ceil(g.avgIndividualAdjCT / summary.requiredTakt)) : null;
+                      return (
+                        <tr key={g.key}>
+                          <td>{g.noProses}</td>
+                          <td>{truncate(g.proses, 26)}</td>
+                          <td className="k-muted">{truncate(g.operatorNames.join(", "), 30)}</td>
+                          <td className="k-num">{g.operatorCount}</td>
+                          <td className="k-num">{fmt1(g.effectiveCT)}s</td>
+                          <td className={`k-num ${isBottleneck ? "k-neg" : ""}`}>
+                            {diff > 0 ? "+" : ""}
+                            {fmt1(diff)}s
+                          </td>
+                          <td className="k-num">
+                            {needed == null ? (
+                              g.operatorCount
+                            ) : (
+                              <>
+                                {g.operatorCount} → <b style={{ color: needed > g.operatorCount ? "#ff8080" : needed < g.operatorCount ? "#2dd4bf" : "inherit" }}>{needed}</b>
+                              </>
+                            )}
+                          </td>
+                          <td>
+                            <span className={`k-tag ${isBottleneck ? "k-tag-critical" : "k-tag-good"}`}>{isBottleneck ? "BOTTLENECK" : "OK"}</span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </HudPanel>
+          </>
+        )}
 
         <footer className="k-footer">
           <span className="k-footer-brand">
             <Gear teeth={8} rOuter={8} rBase={6.4} rBore={2} mode="stroke" color="#57616b" strokeWidth={1.4} opacity={0.8} />
             ASIK CONTROL LAYER
           </span>
-          <span>DATA ILUSTRASI — BELUM TERHUBUNG SPREADSHEET</span>
+          <span>KALKULATOR LINE BALANCING · SEMUA ANGKA DIHITUNG LIVE DI BROWSER ANDA</span>
         </footer>
       </div>
 
       <HudTheme />
-      <style jsx>{`
-        .k-sample-badge {
-          font-family: "IBM Plex Mono", monospace;
-          font-size: 10px;
-          letter-spacing: 0.04em;
-          color: #fab219;
-          border: 1px solid #fab219;
-          padding: 4px 9px;
-          border-radius: 2px;
-          text-transform: uppercase;
-        }
-      `}</style>
     </div>
   );
 }

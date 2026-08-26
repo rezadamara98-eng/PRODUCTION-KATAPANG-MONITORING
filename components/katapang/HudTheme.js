@@ -598,6 +598,157 @@ export default function HudTheme() {
         align-items: center;
         gap: 7px;
       }
+
+      /* ---- Line Balancing calculator: form fields, editable table, suggestions ---- */
+      :global(.k-param-row) {
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+      }
+      :global(.k-field) {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      :global(.k-field label) {
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 10.5px;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: #8b98a3;
+      }
+      :global(.k-hint) {
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 9.5px;
+        color: #57616b;
+      }
+      :global(.k-input) {
+        background: #0d1115;
+        border: 1px solid #262e37;
+        border-radius: 3px;
+        color: #eef3f5;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 14px;
+        padding: 8px 10px;
+        width: 100%;
+      }
+      :global(.k-input:focus) {
+        outline: none;
+        border-color: #2dd4bf;
+        box-shadow: 0 0 0 2px rgba(45, 212, 191, 0.35);
+      }
+      :global(.k-panel-note) {
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 10.5px;
+        color: #57616b;
+        line-height: 1.6;
+        padding: 9px 12px;
+        background: #0d1115;
+        border: 1px solid #1d242b;
+        border-radius: 3px;
+        margin-bottom: 14px;
+      }
+      :global(.k-panel-note b) {
+        color: #8b98a3;
+      }
+
+      :global(.k-lb-table) {
+        min-width: 900px;
+      }
+      :global(.k-lb-table input.k-input) {
+        min-width: 66px;
+        font-size: 12.5px;
+        padding: 6px 7px;
+      }
+      :global(.k-lb-table input.k-input.k-narrow) {
+        width: 64px;
+        min-width: 56px;
+      }
+      :global(.k-lb-table td.k-computed) {
+        color: #8b98a3;
+        text-align: right;
+        white-space: nowrap;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 12px;
+      }
+      :global(.k-row-actions) {
+        display: flex;
+        gap: 6px;
+      }
+      :global(.k-icon-btn) {
+        background: transparent;
+        border: 1px solid #262e37;
+        color: #8b98a3;
+        border-radius: 3px;
+        width: 26px;
+        height: 26px;
+        cursor: pointer;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 14px;
+        line-height: 1;
+      }
+      :global(.k-icon-btn:hover) {
+        border-color: #d03b3b;
+        color: #d03b3b;
+      }
+      :global(.k-add-row-btn) {
+        margin-top: 10px;
+        background: transparent;
+        border: 1px dashed #262e37;
+        color: #8b98a3;
+        border-radius: 3px;
+        padding: 8px 14px;
+        cursor: pointer;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 11.5px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        width: 100%;
+      }
+      :global(.k-add-row-btn:hover) {
+        border-color: #2dd4bf;
+        color: #2dd4bf;
+      }
+
+      :global(.k-suggestion) {
+        display: flex;
+        gap: 10px;
+        padding: 10px 0;
+        border-bottom: 1px solid #1d242b;
+      }
+      :global(.k-suggestion:last-child) {
+        border-bottom: none;
+      }
+      :global(.k-suggestion-dot) {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex: none;
+        margin-top: 5px;
+      }
+      :global(.k-suggestion-dot.split) {
+        background: #d03b3b;
+        box-shadow: 0 0 6px #d03b3b;
+      }
+      :global(.k-suggestion-dot.idle) {
+        background: #fab219;
+        box-shadow: 0 0 6px #fab219;
+      }
+      :global(.k-suggestion-txt) {
+        font-size: 13px;
+        color: #eef3f5;
+        line-height: 1.5;
+      }
+      :global(.k-suggestion-txt b) {
+        color: #2dd4bf;
+      }
+      :global(.k-suggestion-caveat) {
+        display: block;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 10px;
+        color: #57616b;
+        margin-top: 3px;
+      }
     `}</style>
   );
 }
