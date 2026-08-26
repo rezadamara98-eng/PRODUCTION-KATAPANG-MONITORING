@@ -15,30 +15,10 @@ import { computeSummary, buildSuggestions } from "@/lib/lineBalancing";
 // lapangan). Tidak ada penyimpanan otomatis - semua state hilang saat
 // halaman di-refresh, seperti kalkulator kertas biasa.
 //
-// Seed di bawah = contoh nyata Line K04 / style Tour Authentic 2025 yang
-// dikirim sebagai referensi, supaya angka kalkulator ini bisa langsung
-// dicocokkan dengan catatan manual sebelum dipakai leader lain.
+// Tabel sengaja dimulai KOSONG - leader yang isi Line, Style, dan baris
+// cycle time-nya sendiri sesuai kondisi line yang sedang diukur.
 // ---------------------------------------------------------------------------
-const SEED_ROWS = [
-  { id: 1, noProses: "S-1", proses: "SUPPLY SET", nik: "D.15511", operator: "TITIN FURWANTI", cycleTime: 13.73, allowance: 11 },
-  { id: 2, noProses: "S-2", proses: "J. ELASTIC TAB + J. E", nik: "D.13523", operator: "M. SOLIHIN", cycleTime: 27.97, allowance: 11 },
-  { id: 3, noProses: "S-3", proses: "J. IBU JARI", nik: "D.12532", operator: "YAYAN", cycleTime: 46.6, allowance: 11 },
-  { id: 4, noProses: "S-3", proses: "J. IBU JARI", nik: "D.11578", operator: "AKBAR", cycleTime: 52.49, allowance: 11 },
-  { id: 5, noProses: "S-4", proses: "J. TUTUP IBU JARI", nik: "D.13770", operator: "KURNIAWAN", cycleTime: 25.51, allowance: 11 },
-  { id: 6, noProses: "S-5", proses: "J. MACHI", nik: "D.11869", operator: "DEDE S", cycleTime: 58.18, allowance: 11 },
-  { id: 7, noProses: "S-5", proses: "J. MACHI", nik: "D.09790", operator: "JOKO ARI SETIAWAN", cycleTime: 62.38, allowance: 11 },
-  { id: 8, noProses: "S-5", proses: "J. MACHI", nik: "D.12451", operator: "NUNUNG KUSNIDAR", cycleTime: 79.46, allowance: 11 },
-  { id: 9, noProses: "S-6", proses: "CARAHA", nik: "D.13444", operator: "NALA", cycleTime: 22.41, allowance: 11 },
-  { id: 10, noProses: "S-7", proses: "J. LIPAT", nik: "D.12568", operator: "ANDRI MULYANA", cycleTime: 68.82, allowance: 11 },
-  { id: 11, noProses: "S-7", proses: "J. LIPAT", nik: "D.10275", operator: "DUDI HAMZAH", cycleTime: 73.5, allowance: 11 },
-  { id: 12, noProses: "S-7", proses: "J. LIPAT", nik: "D.11655", operator: "SYARIF FATONI", cycleTime: 66.11, allowance: 11 },
-  { id: 13, noProses: "S-8", proses: "J. PASANG TERRYBA", nik: "D.16405", operator: "CHANDRA ANUGRAH SUG", cycleTime: 22.7, allowance: 11 },
-  { id: 14, noProses: "S-9", proses: "J. ELASTIC WRIST", nik: "D.12537", operator: "RUDI", cycleTime: 17.6, allowance: 11 },
-  { id: 15, noProses: "S-10", proses: "J. PULLER", nik: "D.15079", operator: "ERIANSYAH", cycleTime: 19.03, allowance: 11 },
-  { id: 16, noProses: "S-11", proses: "J. MAJIK HALUS", nik: "D.14449", operator: "DIMAS AKBARSYAH", cycleTime: 22.81, allowance: 11 },
-  { id: 17, noProses: "S-12", proses: "J. PITA LOV", nik: "D.13159", operator: "MUHAMMAD RIZKI DARM", cycleTime: 20.86, allowance: 11 },
-  { id: 18, noProses: "S-13", proses: "TRIMMING BODY BE", nik: "D.11826", operator: "CITRA", cycleTime: 29.2, allowance: 11 },
-];
+const SEED_ROWS = [];
 
 const fmt1 = (n) => (Number.isFinite(n) ? n.toFixed(1) : "-");
 const fmt0 = (n) => (Number.isFinite(n) ? Math.round(n).toLocaleString("id-ID") : "-");
@@ -47,9 +27,9 @@ const truncate = (s, n) => (String(s).length > n ? String(s).slice(0, n - 1) + "
 
 export default function LineBalancing() {
   const [rows, setRows] = useState(SEED_ROWS);
-  const [nextId, setNextId] = useState(19);
-  const [lineName, setLineName] = useState("K04");
-  const [styleName, setStyleName] = useState("TOUR AUTHENTIC 2025");
+  const [nextId, setNextId] = useState(1);
+  const [lineName, setLineName] = useState("");
+  const [styleName, setStyleName] = useState("");
   const [workMinutes, setWorkMinutes] = useState(420);
   const [workPerHour, setWorkPerHour] = useState(60);
   const [targetOutput, setTargetOutput] = useState("");
@@ -78,7 +58,7 @@ export default function LineBalancing() {
     setRows((prev) => prev.filter((r) => r.id !== id));
   }
   function addRow() {
-    setRows((prev) => [...prev, { id: nextId, noProses: "", proses: "Proses Baru", nik: "", operator: "", cycleTime: 20, allowance: 11 }]);
+    setRows((prev) => [...prev, { id: nextId, noProses: "", proses: "", nik: "", operator: "", cycleTime: 0, allowance: 11 }]);
     setNextId((n) => n + 1);
   }
 
@@ -117,11 +97,11 @@ export default function LineBalancing() {
           <div className="k-panel-body k-param-row">
             <div className="k-field" style={{ width: 110 }}>
               <label>Line</label>
-              <input className="k-input" type="text" value={lineName} onChange={(e) => setLineName(e.target.value)} />
+              <input className="k-input" type="text" placeholder="mis. K04" value={lineName} onChange={(e) => setLineName(e.target.value)} />
             </div>
             <div className="k-field" style={{ width: 210 }}>
               <label>Style</label>
-              <input className="k-input" type="text" value={styleName} onChange={(e) => setStyleName(e.target.value)} />
+              <input className="k-input" type="text" placeholder="mis. Tour Authentic 2025" value={styleName} onChange={(e) => setStyleName(e.target.value)} />
             </div>
             <div className="k-field" style={{ width: 150 }}>
               <label>Waktu Kerja Tersedia</label>
