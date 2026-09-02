@@ -755,7 +755,7 @@ export default function HudTheme() {
         appearance: none;
         -webkit-appearance: none;
         cursor: pointer;
-        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M0 0l5 6 5-6z' fill='%238b98a3'/></svg>");
+        background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMCIgaGVpZ2h0PSI2Ij48cGF0aCBkPSJNMCAwbDUgNiA1LTZ6IiBmaWxsPSIjOGI5OGEzIi8+PC9zdmc+");
         background-repeat: no-repeat;
         background-position: right 10px center;
         padding-right: 26px;
