@@ -749,6 +749,153 @@ export default function HudTheme() {
         color: #57616b;
         margin-top: 3px;
       }
+
+      /* ---- Line Balancing: dropdown fields (Line / No. Proses) ---- */
+      :global(.k-select) {
+        appearance: none;
+        -webkit-appearance: none;
+        cursor: pointer;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M0 0l5 6 5-6z' fill='%238b98a3'/></svg>");
+        background-repeat: no-repeat;
+        background-position: right 10px center;
+        padding-right: 26px;
+      }
+      :global(.k-lb-table select.k-select) {
+        padding-right: 22px;
+      }
+
+      /* ---- Line Balancing: spinning gears + running-text banner ---- */
+      :global(.k-lb-gear-row) {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex: none;
+      }
+      :global(.k-lb-gear-label) {
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 10px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: #fab219;
+        opacity: 0.75;
+      }
+      :global(.k-lb-ticker-wrap) {
+        width: 100%;
+        overflow: hidden;
+        margin-top: 4px;
+        background: linear-gradient(90deg, rgba(250, 178, 25, 0.14), rgba(250, 178, 25, 0.03));
+        border: 1px solid rgba(250, 178, 25, 0.4);
+        border-radius: 3px;
+        padding: 8px 0;
+        -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 28px, #000 calc(100% - 28px), transparent 100%);
+        mask-image: linear-gradient(90deg, transparent 0, #000 28px, #000 calc(100% - 28px), transparent 100%);
+      }
+      :global(.k-lb-ticker-track) {
+        display: flex;
+        width: max-content;
+        white-space: nowrap;
+        animation-name: k-lb-ticker-scroll;
+        animation-timing-function: linear;
+        animation-iteration-count: infinite;
+        animation-duration: 18s;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        :global(.k-lb-ticker-track) {
+          animation: none;
+        }
+      }
+      @keyframes k-lb-ticker-scroll {
+        from {
+          transform: translateX(0);
+        }
+        to {
+          transform: translateX(-50%);
+        }
+      }
+      :global(.k-lb-ticker-item) {
+        font-family: "Rajdhani", sans-serif;
+        font-weight: 700;
+        font-size: 14px;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+        color: #fab219;
+        text-shadow: 0 0 12px rgba(250, 178, 25, 0.55);
+        padding: 0 20px;
+        flex: none;
+      }
+      :global(.k-lb-ticker-sep) {
+        color: #fab219;
+        opacity: 0.5;
+        flex: none;
+        font-size: 12px;
+      }
+
+      /* ---- Line Balancing: on-demand "Hitung" bar ---- */
+      :global(.k-calc-bar) {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+        background: #12161b;
+        border: 1px solid #262e37;
+        border-radius: 3px;
+        padding: 16px 18px;
+        margin: 18px 0 22px;
+      }
+      :global(.k-calc-status) {
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 11px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: #57616b;
+        margin-bottom: 3px;
+      }
+      :global(.k-calc-status.k-calc-dirty) {
+        color: #fab219;
+      }
+      :global(.k-calc-status.k-calc-done) {
+        color: #0ca30c;
+      }
+      :global(.k-calc-hint) {
+        font-family: "IBM Plex Sans", sans-serif;
+        font-size: 13px;
+        color: #8b98a3;
+      }
+      :global(.k-play-btn) {
+        flex: none;
+        background: #2dd4bf;
+        color: #06110f;
+        border: none;
+        border-radius: 3px;
+        padding: 13px 26px;
+        font-family: "Rajdhani", sans-serif;
+        font-weight: 700;
+        font-size: 14px;
+        letter-spacing: 0.06em;
+        cursor: pointer;
+        box-shadow: 0 0 18px rgba(45, 212, 191, 0.35);
+        transition: transform 0.08s, box-shadow 0.15s;
+      }
+      :global(.k-play-btn:hover) {
+        box-shadow: 0 0 24px rgba(45, 212, 191, 0.55);
+      }
+      :global(.k-play-btn:active) {
+        transform: scale(0.97);
+      }
+      :global(.k-play-btn.k-recalc) {
+        background: #fab219;
+        box-shadow: 0 0 18px rgba(250, 178, 25, 0.35);
+      }
+      :global(.k-play-btn.k-recalc:hover) {
+        box-shadow: 0 0 24px rgba(250, 178, 25, 0.55);
+      }
+      :global(.k-play-btn:disabled) {
+        background: #262e37;
+        color: #57616b;
+        cursor: not-allowed;
+        box-shadow: none;
+      }
     `}</style>
   );
 }

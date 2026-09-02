@@ -17,49 +17,128 @@ import { computeSummary, buildSuggestions } from "@/lib/lineBalancing";
 //
 // Tabel sengaja dimulai KOSONG - leader yang isi Line, Style, dan baris
 // cycle time-nya sendiri sesuai kondisi line yang sedang diukur.
+//
+// Hasil (KPI/chart/saran/tabel detail) HANYA dihitung ulang saat leader
+// menekan tombol "Hitung" - input tabel di atas tetap live (kolom CT/SMV
+// per baris langsung terhitung), tapi bagian hasil di bawah baru diperbarui
+// on-demand supaya leader tidak melihat angka "melompat-lompat" saat masih
+// mengetik.
 // ---------------------------------------------------------------------------
 const SEED_ROWS = [];
+
+const LINE_OPTIONS = Array.from({ length: 60 }, (_, i) => `K${String(i + 1).padStart(2, "0")}`);
+const NO_PROSES_OPTIONS = Array.from({ length: 20 }, (_, i) => `S-${i + 1}`);
+const PROSES_PRESETS = [
+  "SUPPLY SET",
+  "J. ELASTIC TAB + J. ELASTIC KNUCKLE",
+  "J. IBU JARI",
+  "J. TUTUP IBU JARI",
+  "J. MACHI",
+  "CARAHA",
+  "J. LIPAT",
+  "J. PASANG TERRYBAND",
+  "J. ELASTIC WRIST",
+  "J. PULLER",
+  "J. MAJIK HALUS",
+  "J. PITA LOV",
+  "TRIMMING BODY BENANG",
+];
+const RUNNING_TEXT = "LINE BALANCING BUKAN SEKEDAR TEKNIK, TAPI KUNCI PRODUKTIVITAS TANPA HENTI";
 
 const fmt1 = (n) => (Number.isFinite(n) ? n.toFixed(1) : "-");
 const fmt0 = (n) => (Number.isFinite(n) ? Math.round(n).toLocaleString("id-ID") : "-");
 const fmt2 = (n) => (Number.isFinite(n) ? n.toFixed(2) : "-");
 const truncate = (s, n) => (String(s).length > n ? String(s).slice(0, n - 1) + "…" : String(s));
 
+// Hanya izinkan angka & satu titik desimal - dibersihkan di tempat (tanpa
+// parseFloat) supaya nilai yang tersimpan persis sama dengan yang diketik,
+// sehingga kursor tidak "melompat" saat leader mengetik cycle time/allowance.
+function cleanNumericInput(value) {
+  return String(value).replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1");
+}
+
 export default function LineBalancing() {
   const [rows, setRows] = useState(SEED_ROWS);
   const [nextId, setNextId] = useState(1);
   const [lineName, setLineName] = useState("");
   const [styleName, setStyleName] = useState("");
-  const [workMinutes, setWorkMinutes] = useState(420);
   const [workPerHour, setWorkPerHour] = useState(60);
   const [targetOutput, setTargetOutput] = useState("");
 
-  const summary = useMemo(
-    () =>
-      computeSummary({
-        rows,
-        workPerHour: parseFloat(workPerHour) || 60,
-        workMinutes: parseFloat(workMinutes) || 0,
-        targetOutput: targetOutput === "" ? null : parseFloat(targetOutput),
-      }),
-    [rows, workPerHour, workMinutes, targetOutput]
-  );
+  // Penanda "kotor" (ada perubahan input sejak terakhir dihitung) tanpa perlu
+  // deep-compare - setiap perubahan yang memengaruhi hasil menaikkan
+  // editVersion; saat "Hitung" ditekan, calculatedVersion disamakan dengan
+  // editVersion saat itu. Kalau keduanya beda lagi, berarti sudah ada
+  // perubahan baru.
+  const [editVersion, setEditVersion] = useState(0);
+  const [calculatedVersion, setCalculatedVersion] = useState(null);
+  const [calcSnapshot, setCalcSnapshot] = useState(null);
 
+  const hasCalculated = calculatedVersion !== null;
+  const isDirty = hasCalculated && calculatedVersion !== editVersion;
+
+  function markEdited() {
+    setEditVersion((v) => v + 1);
+  }
+
+  const summary = useMemo(() => (calcSnapshot ? computeSummary(calcSnapshot) : null), [calcSnapshot]);
   const suggestions = summary ? buildSuggestions(summary.groups, summary.referenceTakt) : [];
+
+  const hasValidRows = rows.some((r) => (r.proses || "").trim() && Number(r.cycleTime) > 0);
 
   function updateRow(id, field, value) {
     setRows((prev) =>
-      prev.map((r) =>
-        r.id === id ? { ...r, [field]: field === "cycleTime" || field === "allowance" ? parseFloat(value) || 0 : value } : r
-      )
+      prev.map((r) => {
+        if (r.id !== id) return r;
+        if (field === "cycleTime" || field === "allowance") {
+          return { ...r, [field]: cleanNumericInput(value) };
+        }
+        return { ...r, [field]: value };
+      })
     );
+    markEdited();
   }
   function removeRow(id) {
     setRows((prev) => prev.filter((r) => r.id !== id));
+    markEdited();
   }
   function addRow() {
     setRows((prev) => [...prev, { id: nextId, noProses: "", proses: "", nik: "", operator: "", cycleTime: 0, allowance: 11 }]);
     setNextId((n) => n + 1);
+    markEdited();
+  }
+  function handleCalculate() {
+    if (!hasValidRows) return;
+    setCalcSnapshot({
+      rows,
+      workPerHour: parseFloat(workPerHour) || 60,
+      targetOutput: targetOutput === "" ? null : parseFloat(targetOutput),
+    });
+    setCalculatedVersion(editVersion);
+  }
+
+  let calcStatusText;
+  let calcStatusClass = "k-calc-status";
+  let calcHintText;
+  let calcBtnText;
+  let calcBtnClass = "k-play-btn";
+  if (!hasCalculated) {
+    calcStatusText = "BELUM DIHITUNG";
+    calcHintText = hasValidRows
+      ? "Data sudah siap — tekan tombol untuk menampilkan hasil perhitungan."
+      : "Isi data cycle time di atas, lalu tekan tombol ini untuk menampilkan hasil.";
+    calcBtnText = "▶  HITUNG SEKARANG";
+  } else if (isDirty) {
+    calcStatusText = "ADA PERUBAHAN — BELUM DIHITUNG ULANG";
+    calcStatusClass = "k-calc-status k-calc-dirty";
+    calcHintText = "Data sudah diubah sejak terakhir dihitung. Tekan tombol untuk memperbarui hasil.";
+    calcBtnText = "⟳  HITUNG ULANG";
+    calcBtnClass = "k-play-btn k-recalc";
+  } else {
+    calcStatusText = "HASIL TERKINI";
+    calcStatusClass = "k-calc-status k-calc-done";
+    calcHintText = "Hasil di bawah sesuai data saat tombol ini terakhir ditekan.";
+    calcBtnText = "✓  HASIL TERKINI";
   }
 
   return (
@@ -87,6 +166,21 @@ export default function LineBalancing() {
           <div className="k-sys-status">
             <span className="k-tag k-tag-good">KALKULATOR INTERAKTIF · TIDAK TERSIMPAN OTOMATIS</span>
           </div>
+
+          <div className="k-lb-gear-row" aria-hidden="true">
+            <Gear teeth={8} rOuter={13} rBase={10.2} rBore={4.5} mode="fill" color="#fab219" spin="cw" duration={6} />
+            <Gear teeth={6} rOuter={9} rBase={7} rBore={3.2} mode="fill" color="#2dd4bf" spin="ccw" duration={4.2} style={{ marginLeft: -6 }} />
+            <span className="k-lb-gear-label">SISTEM BERJALAN</span>
+          </div>
+
+          <div className="k-lb-ticker-wrap">
+            <div className="k-lb-ticker-track">
+              <span className="k-lb-ticker-item">{RUNNING_TEXT}</span>
+              <span className="k-lb-ticker-sep">◆</span>
+              <span className="k-lb-ticker-item">{RUNNING_TEXT}</span>
+              <span className="k-lb-ticker-sep">◆</span>
+            </div>
+          </div>
         </div>
 
         <div className="k-section-title">
@@ -97,33 +191,47 @@ export default function LineBalancing() {
           <div className="k-panel-body k-param-row">
             <div className="k-field" style={{ width: 110 }}>
               <label>Line</label>
-              <input className="k-input" type="text" placeholder="mis. K04" value={lineName} onChange={(e) => setLineName(e.target.value)} />
+              <select className="k-input k-select" value={lineName} onChange={(e) => setLineName(e.target.value)}>
+                <option value="">— Pilih —</option>
+                {LINE_OPTIONS.map((code) => (
+                  <option key={code} value={code}>
+                    {code}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="k-field" style={{ width: 210 }}>
               <label>Style</label>
               <input className="k-input" type="text" placeholder="mis. Tour Authentic 2025" value={styleName} onChange={(e) => setStyleName(e.target.value)} />
             </div>
             <div className="k-field" style={{ width: 150 }}>
-              <label>Waktu Kerja Tersedia</label>
-              <input className="k-input" type="number" min="1" value={workMinutes} onChange={(e) => setWorkMinutes(e.target.value)} />
-              <span className="k-hint">menit / shift</span>
-            </div>
-            <div className="k-field" style={{ width: 130 }}>
-              <label>Waktu Kerja / Jam</label>
-              <input className="k-input" type="number" min="1" value={workPerHour} onChange={(e) => setWorkPerHour(e.target.value)} />
-              <span className="k-hint">menit — konversi detik→menit</span>
+              <label>Waktu Kerja ( Jam )</label>
+              <input
+                className="k-input"
+                type="number"
+                min="1"
+                value={workPerHour}
+                onChange={(e) => {
+                  setWorkPerHour(e.target.value);
+                  markEdited();
+                }}
+              />
+              <span className="k-hint">menit kerja bersih per jam — basis semua hitungan waktu</span>
             </div>
             <div className="k-field" style={{ width: 170 }}>
-              <label>Target Output (opsional)</label>
+              <label>Target Output / Jam (opsional)</label>
               <input
                 className="k-input"
                 type="number"
                 min="0"
-                placeholder="mis. 480"
+                placeholder="mis. 68"
                 value={targetOutput}
-                onChange={(e) => setTargetOutput(e.target.value)}
+                onChange={(e) => {
+                  setTargetOutput(e.target.value);
+                  markEdited();
+                }}
               />
-              <span className="k-hint">pcs / shift — kosongkan jika belum ada target</span>
+              <span className="k-hint">pcs / jam — kosongkan jika belum ada target</span>
             </div>
           </div>
         </div>
@@ -159,16 +267,30 @@ export default function LineBalancing() {
                 <tbody>
                   {rows.map((r) => {
                     const workPerHourNum = parseFloat(workPerHour) || 60;
-                    const adjCT = r.cycleTime * (1 + (r.allowance || 0) / 100);
+                    const adjCT = (parseFloat(r.cycleTime) || 0) * (1 + (parseFloat(r.allowance) || 0) / 100);
                     const ctMin = workPerHourNum > 0 ? adjCT / workPerHourNum : 0;
                     const smv = Math.ceil(ctMin * 100) / 100;
                     return (
                       <tr key={r.id}>
                         <td>
-                          <input className="k-input k-narrow" type="text" placeholder="S-1" value={r.noProses} onChange={(e) => updateRow(r.id, "noProses", e.target.value)} />
+                          <select className="k-input k-narrow k-select" value={r.noProses} onChange={(e) => updateRow(r.id, "noProses", e.target.value)}>
+                            <option value="">— Pilih —</option>
+                            {NO_PROSES_OPTIONS.map((code) => (
+                              <option key={code} value={code}>
+                                {code}
+                              </option>
+                            ))}
+                          </select>
                         </td>
                         <td>
-                          <input className="k-input" type="text" placeholder="Nama proses" value={r.proses} onChange={(e) => updateRow(r.id, "proses", e.target.value)} />
+                          <input
+                            className="k-input"
+                            type="text"
+                            list="k-lb-proses-list"
+                            placeholder="Pilih atau ketik nama proses"
+                            value={r.proses}
+                            onChange={(e) => updateRow(r.id, "proses", e.target.value)}
+                          />
                         </td>
                         <td>
                           <input className="k-input" type="text" placeholder="NIK" value={r.nik} onChange={(e) => updateRow(r.id, "nik", e.target.value)} />
@@ -177,10 +299,24 @@ export default function LineBalancing() {
                           <input className="k-input" type="text" placeholder="Operator" value={r.operator} onChange={(e) => updateRow(r.id, "operator", e.target.value)} />
                         </td>
                         <td>
-                          <input className="k-input k-narrow" type="number" min="0" step="0.01" value={r.cycleTime} onChange={(e) => updateRow(r.id, "cycleTime", e.target.value)} />
+                          <input
+                            className="k-input k-narrow"
+                            type="text"
+                            inputMode="decimal"
+                            value={r.cycleTime}
+                            onChange={(e) => updateRow(r.id, "cycleTime", e.target.value)}
+                            onFocus={(e) => e.target.select()}
+                          />
                         </td>
                         <td>
-                          <input className="k-input k-narrow" type="number" min="0" step="0.5" value={r.allowance} onChange={(e) => updateRow(r.id, "allowance", e.target.value)} />
+                          <input
+                            className="k-input k-narrow"
+                            type="text"
+                            inputMode="decimal"
+                            value={r.allowance}
+                            onChange={(e) => updateRow(r.id, "allowance", e.target.value)}
+                            onFocus={(e) => e.target.select()}
+                          />
                         </td>
                         <td className="k-computed">{fmt2(ctMin)}</td>
                         <td className="k-computed">{fmt2(smv)}</td>
@@ -194,6 +330,11 @@ export default function LineBalancing() {
                   })}
                 </tbody>
               </table>
+              <datalist id="k-lb-proses-list">
+                {PROSES_PRESETS.map((p) => (
+                  <option key={p} value={p} />
+                ))}
+              </datalist>
             </div>
             <button className="k-add-row-btn" onClick={addRow}>
               + Tambah Baris
@@ -201,9 +342,19 @@ export default function LineBalancing() {
           </div>
         </div>
 
+        <div className="k-calc-bar">
+          <div>
+            <div className={calcStatusClass}>{calcStatusText}</div>
+            <div className="k-calc-hint">{calcHintText}</div>
+          </div>
+          <button className={calcBtnClass} disabled={!hasValidRows} onClick={handleCalculate}>
+            {calcBtnText}
+          </button>
+        </div>
+
         {!summary ? (
-          <div className="k-empty" style={{ padding: "20px 4px" }}>
-            Tambahkan minimal 1 baris dengan nama proses dan cycle time untuk mulai hitung.
+          <div className="k-empty" style={{ padding: "22px 4px" }}>
+            Belum ada hasil — isi data di atas lalu tekan &quot;Hitung Sekarang&quot;.
           </div>
         ) : (
           <>
@@ -223,10 +374,10 @@ export default function LineBalancing() {
               />
               <KpiTile
                 label="Output Tercapai"
-                value={fmt0(summary.currentOutputShift)}
-                unit="pcs/shift"
+                value={fmt1(summary.currentOutputHour)}
+                unit="pcs/jam"
                 hasData
-                foot={`≈ ${fmt1(summary.currentOutputHour)} pcs/jam, dari bottleneck saat ini`}
+                foot="Waktu Kerja (Jam) ÷ CT efektif bottleneck"
               />
               <KpiTile
                 label="Jumlah Station"
@@ -242,7 +393,7 @@ export default function LineBalancing() {
                     value={fmt1(summary.requiredTakt)}
                     unit="detik"
                     hasData
-                    foot={`untuk capai ${fmt0(parseFloat(targetOutput))} pcs/shift`}
+                    foot={`untuk capai ${fmt0(calcSnapshot.targetOutput)} pcs/jam`}
                   />
                   <KpiTile
                     label="Total Operator Dibutuhkan"
