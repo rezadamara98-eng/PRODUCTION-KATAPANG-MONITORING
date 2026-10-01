@@ -518,6 +518,7 @@ export default function GantiPola() {
                       <th>SPO</th>
                       <th>Size</th>
                       <th>Jenis</th>
+                      <th>Style</th>
                       <th>Keterangan</th>
                       <th style={{ textAlign: "right" }}>Qty Reject</th>
                       <th style={{ textAlign: "right" }}>Progress Preparation</th>
@@ -541,6 +542,7 @@ export default function GantiPola() {
                           <td>
                             <span className={jenisTagClass(t.jenis)}>{t.jenis}</span>
                           </td>
+                          <td>{t.style || <span className="gp-tag dim">-</span>}</td>
                           <td>{t.keterangan}</td>
                           <td className="gp-num">{t.qtyReject}</td>
                           <td className="gp-num">
@@ -601,6 +603,7 @@ export default function GantiPola() {
                       <th>SPO</th>
                       <th>Size</th>
                       <th>Jenis</th>
+                      <th>Style</th>
                       <th>Keterangan</th>
                       <th style={{ textAlign: "right" }}>Diterima dari Preparation</th>
                       <th style={{ textAlign: "right" }}>Progress Presub</th>
@@ -624,6 +627,7 @@ export default function GantiPola() {
                           <td>
                             <span className={jenisTagClass(t.jenis)}>{t.jenis}</span>
                           </td>
+                          <td>{t.style || <span className="gp-tag dim">-</span>}</td>
                           <td>{t.keterangan}</td>
                           <td className="gp-num">{t.qtyPrep}</td>
                           <td className="gp-num">
@@ -709,6 +713,7 @@ export default function GantiPola() {
                       <th>SPO</th>
                       <th>Size</th>
                       <th>Jenis</th>
+                      <th>Style</th>
                       <th>Keterangan</th>
                       <th>Tgl Request</th>
                       <th style={{ textAlign: "right" }}>Qty Reject</th>
@@ -734,6 +739,7 @@ export default function GantiPola() {
                           <td>
                             <span className={jenisTagClass(t.jenis)}>{t.jenis}</span>
                           </td>
+                          <td>{t.style || <span className="gp-tag dim">-</span>}</td>
                           <td>{t.keterangan}</td>
                           <td style={{ whiteSpace: "nowrap" }}>{fmtDateTime(t.tglRequest)}</td>
                           <td className="gp-num">{t.qtyReject}</td>
