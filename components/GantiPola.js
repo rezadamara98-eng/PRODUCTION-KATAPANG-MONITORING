@@ -7,6 +7,11 @@ const SIZE_OPTIONS = ["XS", "S", "M", "L", "XL", "XXL"];
 const KETERANGAN_OPTIONS = ["Bolong", "Benang Putus", "Jahitan Miring/Dobel", "Warna Belang", "Ukuran Tidak Sesuai", "Noda/Kotor"];
 const JENIS_OPTIONS = ["Part", "Pola Full"];
 const REFRESH_MS = 25000;
+const AREAS = [
+  { key: "sewing", num: "1", short: "Sewing", title: "Production Sewing", desc: "Ajukan permintaan ganti pola untuk part yang reject." },
+  { key: "prep", num: "2", short: "Preparation", title: "Preparation", desc: "Proses cutting ganti pola dan kirim ke Presub." },
+  { key: "presub", num: "3", short: "Presub", title: "Presub", desc: "Jahit persiapan dan selesaikan, kirim balik ke Sewing." },
+];
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
 
 function toDate(v) {
@@ -120,6 +125,11 @@ export default function GantiPola() {
   const [submittingId, setSubmittingId] = useState(null);
   const [ajukanMsg, setAjukanMsg] = useState("");
   const [actionError, setActionError] = useState("");
+
+  // Layar depan menampilkan 3 pilihan area (Sewing / Preparation / Presub).
+  // Form/tabel baru muncul untuk area yang dipilih saja, supaya tiap stasiun
+  // hanya melihat bagian kerjanya sendiri.
+  const [area, setArea] = useState(null); // null = layar pilih area; "sewing" | "prep" | "presub"
 
   // Peta SPO -> Style (read-only, dari tab "data base SPO & STYLE") - dimuat
   // sekali di awal, lalu dipakai untuk auto-tampil nama Style begitu Sewing
@@ -360,6 +370,42 @@ export default function GantiPola() {
             Presub selesai, dikirim balik ke Sewing dan permintaan ditutup.
           </div>
 
+          {area === null ? (
+            <div>
+              <div className="gp-area-heading">Pilih area kerja Anda</div>
+              <div className="gp-area-grid">
+                {AREAS.map((a) => (
+                  <button key={a.key} className="gp-area-card" onClick={() => setArea(a.key)}>
+                    <span className={`gp-area-num ${a.key === "sewing" ? "" : "teal"}`}>{a.num}</span>
+                    <span className="gp-area-title">{a.title}</span>
+                    <span className="gp-area-desc">{a.desc}</span>
+                    <span className="gp-area-badge">
+                      {a.key === "sewing"
+                        ? "Lapor part reject"
+                        : `${a.key === "prep" ? outstandingPrep.length : outstandingPresub.length} outstanding`}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="gp-area-switch">
+              <button className="gp-btn-small" onClick={() => setArea(null)}>
+                &larr; Pilih Area
+              </button>
+              {AREAS.map((a) => (
+                <button
+                  key={a.key}
+                  className={`gp-filter-btn ${area === a.key ? "active" : ""}`}
+                  onClick={() => setArea(a.key)}
+                >
+                  {a.num}. {a.short}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {area === "sewing" && (
           <div className="gp-section-title">
             <h2>
               <span className="gp-step-num">1</span>
@@ -367,6 +413,8 @@ export default function GantiPola() {
               <span className="sub">LAPOR REJECT</span>
             </h2>
           </div>
+          )}
+          {area === "sewing" && (
           <div className="gp-panel">
             <div className="gp-panel-body">
               <div className="gp-panel-note">
@@ -495,7 +543,9 @@ export default function GantiPola() {
               {actionError && <div className="gp-msg-error" style={{ marginTop: 10 }}>{actionError}</div>}
             </div>
           </div>
+          )}
 
+          {area === "prep" && (
           <div className="gp-section-title sub2">
             <h2>
               <span className="gp-step-num teal">2</span>
@@ -503,6 +553,8 @@ export default function GantiPola() {
               <span className="sub">{outstandingPrep.length} OUTSTANDING</span>
             </h2>
           </div>
+          )}
+          {area === "prep" && (
           <div className="gp-panel">
             <div className="gp-panel-body">
               <div className="gp-panel-note">
@@ -580,7 +632,9 @@ export default function GantiPola() {
               )}
             </div>
           </div>
+          )}
 
+          {area === "presub" && (
           <div className="gp-section-title sub2">
             <h2>
               <span className="gp-step-num teal">3</span>
@@ -588,6 +642,8 @@ export default function GantiPola() {
               <span className="sub">{outstandingPresub.length} OUTSTANDING</span>
             </h2>
           </div>
+          )}
+          {area === "presub" && (
           <div className="gp-panel">
             <div className="gp-panel-body">
               <div className="gp-panel-note">
@@ -665,6 +721,7 @@ export default function GantiPola() {
               )}
             </div>
           </div>
+          )}
         </div>
       )}
 
@@ -892,6 +949,88 @@ export default function GantiPola() {
         }
         .gp-section-title.sub2 h2 {
           background: var(--teal-dim);
+        }
+        .gp-area-heading {
+          font-family: var(--font-display);
+          font-weight: 700;
+          font-size: 14px;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+          color: var(--navy);
+          margin: 18px 0 12px;
+        }
+        .gp-area-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 14px;
+          margin-bottom: 18px;
+        }
+        @media (max-width: 760px) {
+          .gp-area-grid {
+            grid-template-columns: 1fr;
+          }
+        }
+        .gp-area-card {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 8px;
+          text-align: left;
+          background: var(--panel);
+          border: 1px solid var(--steel);
+          border-top: 4px solid var(--navy);
+          border-radius: 3px;
+          padding: 18px 18px 16px;
+          cursor: pointer;
+          font-family: var(--font-body);
+        }
+        .gp-area-card:hover {
+          border-color: var(--teal);
+          box-shadow: 0 0 0 2px rgba(58, 183, 196, 0.2);
+        }
+        .gp-area-num {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 28px;
+          height: 28px;
+          border-radius: 50%;
+          background: var(--navy);
+          color: #fff;
+          font-family: var(--font-mono);
+          font-size: 13px;
+          font-weight: 600;
+        }
+        .gp-area-num.teal {
+          background: var(--teal-dim);
+        }
+        .gp-area-title {
+          font-family: var(--font-display);
+          font-weight: 700;
+          font-size: 17px;
+          color: var(--navy);
+        }
+        .gp-area-desc {
+          font-size: 12.5px;
+          color: var(--text-muted);
+          line-height: 1.5;
+        }
+        .gp-area-badge {
+          font-family: var(--font-mono);
+          font-size: 10.5px;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+          color: var(--teal-dim);
+          border: 1px solid currentColor;
+          border-radius: 2px;
+          padding: 2px 8px;
+        }
+        .gp-area-switch {
+          display: flex;
+          gap: 8px;
+          flex-wrap: wrap;
+          align-items: center;
+          margin-bottom: 4px;
         }
 
         .gp-panel {
