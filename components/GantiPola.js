@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-const LINE_OPTIONS = Array.from({ length: 60 }, (_, i) => `K${String(i + 1).padStart(2, "0")}`);
+// "Quality Area" ikut jadi pilihan peminta selain Line produksi K01-K60 (Quality
+// juga bisa mengajukan ganti pola). Disimpan apa adanya di kolom Line.
+const LINE_OPTIONS = ["Quality Area", ...Array.from({ length: 60 }, (_, i) => `K${String(i + 1).padStart(2, "0")}`)];
 const SIZE_OPTIONS = ["XS", "S", "M", "L", "XL", "XXL"];
 const KETERANGAN_OPTIONS = ["Bolong", "Benang Putus", "Jahitan Miring/Dobel", "Warna Belang", "Ukuran Tidak Sesuai", "Noda/Kotor"];
 const JENIS_OPTIONS = ["Part", "Pola Full"];
@@ -61,8 +63,9 @@ function uniqueLines(list) {
     a.localeCompare(b, undefined, { numeric: true })
   );
 }
-function applyLineView(list, lineFilter, sortDir) {
+function applyLineView(list, lineFilter, jenisFilter, sortDir) {
   let out = lineFilter ? list.filter((t) => t.line === lineFilter) : list;
+  if (jenisFilter) out = out.filter((t) => t.jenis === jenisFilter);
   if (sortDir !== "none") {
     const dir = sortDir === "asc" ? 1 : -1;
     out = [...out].sort((a, b) => a.line.localeCompare(b.line, undefined, { numeric: true }) * dir);
@@ -148,6 +151,8 @@ export default function GantiPola() {
   // hanya melihat bagian kerjanya sendiri.
   const [prepLine, setPrepLine] = useState(""); // "" = semua Line
   const [presubLine, setPresubLine] = useState("");
+  const [prepJenis, setPrepJenis] = useState(""); // "" = semua jenis
+  const [presubJenis, setPresubJenis] = useState("");
   const [lineSort, setLineSort] = useState({ prep: "none", presub: "none" });
   const cycleLineSort = (key) => setLineSort((s) => ({ ...s, [key]: SORT_NEXT[s[key]] }));
   const [area, setArea] = useState(null); // null = layar pilih area; "sewing" | "prep" | "presub"
@@ -315,12 +320,12 @@ export default function GantiPola() {
   const effPrepLine = prepLineOptions.includes(prepLine) ? prepLine : "";
   const effPresubLine = presubLineOptions.includes(presubLine) ? presubLine : "";
   const visiblePrep = useMemo(
-    () => applyLineView(outstandingPrep, effPrepLine, lineSort.prep),
-    [outstandingPrep, effPrepLine, lineSort.prep]
+    () => applyLineView(outstandingPrep, effPrepLine, prepJenis, lineSort.prep),
+    [outstandingPrep, effPrepLine, prepJenis, lineSort.prep]
   );
   const visiblePresub = useMemo(
-    () => applyLineView(outstandingPresub, effPresubLine, lineSort.presub),
-    [outstandingPresub, effPresubLine, lineSort.presub]
+    () => applyLineView(outstandingPresub, effPresubLine, presubJenis, lineSort.presub),
+    [outstandingPresub, effPresubLine, presubJenis, lineSort.presub]
   );
 
   const kpiData = useMemo(() => {
@@ -461,7 +466,7 @@ export default function GantiPola() {
               <div className="gp-param-row" style={{ marginBottom: 14 }}>
                 <div className="gp-field">
                   <label>Line (Peminta)</label>
-                  <select className="gp-input" style={{ width: 110 }} value={inLine} onChange={(e) => setInLine(e.target.value)}>
+                  <select className="gp-input" style={{ width: 160 }} value={inLine} onChange={(e) => setInLine(e.target.value)}>
                     <option value="">&mdash; Pilih &mdash;</option>
                     {LINE_OPTIONS.map((code) => (
                       <option key={code} value={code}>
@@ -616,6 +621,22 @@ export default function GantiPola() {
                     </select>
                   </div>
                   <div className="gp-field">
+                    <label>Filter Jenis</label>
+                    <select
+                      className="gp-input"
+                      style={{ width: 140 }}
+                      value={prepJenis}
+                      onChange={(e) => setPrepJenis(e.target.value)}
+                    >
+                      <option value="">Semua Jenis</option>
+                      {JENIS_OPTIONS.map((j) => (
+                        <option key={j} value={j}>
+                          {j}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="gp-field">
                     <label>Urutan</label>
                     <button className="gp-btn-small" onClick={() => cycleLineSort("prep")}>
                       {SORT_LABEL[lineSort.prep]}
@@ -696,7 +717,7 @@ export default function GantiPola() {
                 <div className="gp-empty-note">Tidak ada permintaan outstanding di Preparation saat ini.</div>
               )}
               {outstandingPrep.length > 0 && visiblePrep.length === 0 && (
-                <div className="gp-empty-note">Tidak ada tiket outstanding untuk Line {effPrepLine}.</div>
+                <div className="gp-empty-note">Tidak ada tiket outstanding yang cocok dengan filter yang dipilih.</div>
               )}
             </div>
           </div>
@@ -732,6 +753,22 @@ export default function GantiPola() {
                       {presubLineOptions.map((l) => (
                         <option key={l} value={l}>
                           {l}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="gp-field">
+                    <label>Filter Jenis</label>
+                    <select
+                      className="gp-input"
+                      style={{ width: 140 }}
+                      value={presubJenis}
+                      onChange={(e) => setPresubJenis(e.target.value)}
+                    >
+                      <option value="">Semua Jenis</option>
+                      {JENIS_OPTIONS.map((j) => (
+                        <option key={j} value={j}>
+                          {j}
                         </option>
                       ))}
                     </select>
@@ -817,7 +854,7 @@ export default function GantiPola() {
                 <div className="gp-empty-note">Tidak ada beban outstanding di Presub saat ini.</div>
               )}
               {outstandingPresub.length > 0 && visiblePresub.length === 0 && (
-                <div className="gp-empty-note">Tidak ada tiket outstanding untuk Line {effPresubLine}.</div>
+                <div className="gp-empty-note">Tidak ada tiket outstanding yang cocok dengan filter yang dipilih.</div>
               )}
             </div>
           </div>
