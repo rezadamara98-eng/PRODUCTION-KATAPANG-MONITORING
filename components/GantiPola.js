@@ -52,6 +52,23 @@ function normalizeSpo(s) {
     .replace(/[^0-9/]/g, "")
     .trim();
 }
+// Filter per Line + urutan Line untuk tabel Preparation/Presub. Sort stabil, jadi
+// di dalam satu Line urutan aslinya (tiket terbaru di atas) tetap terjaga.
+const SORT_NEXT = { none: "asc", asc: "desc", desc: "none" };
+const SORT_LABEL = { none: "Terbaru", asc: "Line A-Z (K01 ke K60)", desc: "Line Z-A (K60 ke K01)" };
+function uniqueLines(list) {
+  return Array.from(new Set(list.map((t) => t.line).filter(Boolean))).sort((a, b) =>
+    a.localeCompare(b, undefined, { numeric: true })
+  );
+}
+function applyLineView(list, lineFilter, sortDir) {
+  let out = lineFilter ? list.filter((t) => t.line === lineFilter) : list;
+  if (sortDir !== "none") {
+    const dir = sortDir === "asc" ? 1 : -1;
+    out = [...out].sort((a, b) => a.line.localeCompare(b.line, undefined, { numeric: true }) * dir);
+  }
+  return out;
+}
 function statusOf(t) {
   if (t.qtyPresub >= t.qtyReject) return "SELESAI";
   if (t.qtyPrep === 0) return "BARU";
@@ -129,6 +146,10 @@ export default function GantiPola() {
   // Layar depan menampilkan 3 pilihan area (Sewing / Preparation / Presub).
   // Form/tabel baru muncul untuk area yang dipilih saja, supaya tiap stasiun
   // hanya melihat bagian kerjanya sendiri.
+  const [prepLine, setPrepLine] = useState(""); // "" = semua Line
+  const [presubLine, setPresubLine] = useState("");
+  const [lineSort, setLineSort] = useState({ prep: "none", presub: "none" });
+  const cycleLineSort = (key) => setLineSort((s) => ({ ...s, [key]: SORT_NEXT[s[key]] }));
   const [area, setArea] = useState(null); // null = layar pilih area; "sewing" | "prep" | "presub"
 
   // Peta SPO -> Style (read-only, dari tab "data base SPO & STYLE") - dimuat
@@ -286,6 +307,21 @@ export default function GantiPola() {
 
   const outstandingPrep = useMemo(() => tickets.filter((t) => t.qtyPrep < t.qtyReject), [tickets]);
   const outstandingPresub = useMemo(() => tickets.filter((t) => t.qtyPrep > t.qtyPresub), [tickets]);
+
+  // Kalau Line yang sedang dipilih sudah tidak punya tiket outstanding (semua
+  // selesai), filter otomatis kembali ke "Semua Line" supaya tabel tidak kosong.
+  const prepLineOptions = useMemo(() => uniqueLines(outstandingPrep), [outstandingPrep]);
+  const presubLineOptions = useMemo(() => uniqueLines(outstandingPresub), [outstandingPresub]);
+  const effPrepLine = prepLineOptions.includes(prepLine) ? prepLine : "";
+  const effPresubLine = presubLineOptions.includes(presubLine) ? presubLine : "";
+  const visiblePrep = useMemo(
+    () => applyLineView(outstandingPrep, effPrepLine, lineSort.prep),
+    [outstandingPrep, effPrepLine, lineSort.prep]
+  );
+  const visiblePresub = useMemo(
+    () => applyLineView(outstandingPresub, effPresubLine, lineSort.presub),
+    [outstandingPresub, effPresubLine, lineSort.presub]
+  );
 
   const kpiData = useMemo(() => {
     const totalTiket = tickets.length;
@@ -561,6 +597,35 @@ export default function GantiPola() {
                 Daftar di bawah adalah permintaan yang <b>masih ada sisa qty</b> untuk dikerjakan Preparation. Qty yang dicatat
                 selesai otomatis diteruskan sebagai beban Presub. Boleh dicicil (tidak harus sekaligus).
               </div>
+              {outstandingPrep.length > 0 && (
+                <div className="gp-line-bar">
+                  <div className="gp-field">
+                    <label>Filter Line</label>
+                    <select
+                      className="gp-input"
+                      style={{ width: 140 }}
+                      value={effPrepLine}
+                      onChange={(e) => setPrepLine(e.target.value)}
+                    >
+                      <option value="">Semua Line</option>
+                      {prepLineOptions.map((l) => (
+                        <option key={l} value={l}>
+                          {l}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="gp-field">
+                    <label>Urutan</label>
+                    <button className="gp-btn-small" onClick={() => cycleLineSort("prep")}>
+                      {SORT_LABEL[lineSort.prep]}
+                    </button>
+                  </div>
+                  <span className="gp-line-count">
+                    Menampilkan {visiblePrep.length} dari {outstandingPrep.length} tiket
+                  </span>
+                </div>
+              )}
               <div className="gp-table-scroll">
                 <table className="gp-table">
                   <thead>
@@ -581,7 +646,7 @@ export default function GantiPola() {
                     </tr>
                   </thead>
                   <tbody>
-                    {outstandingPrep.map((t) => {
+                    {visiblePrep.map((t) => {
                       const sisa = t.qtyReject - t.qtyPrep;
                       return (
                         <tr key={t.id}>
@@ -630,6 +695,9 @@ export default function GantiPola() {
               {outstandingPrep.length === 0 && (
                 <div className="gp-empty-note">Tidak ada permintaan outstanding di Preparation saat ini.</div>
               )}
+              {outstandingPrep.length > 0 && visiblePrep.length === 0 && (
+                <div className="gp-empty-note">Tidak ada tiket outstanding untuk Line {effPrepLine}.</div>
+              )}
             </div>
           </div>
           )}
@@ -650,6 +718,35 @@ export default function GantiPola() {
                 Daftar di bawah adalah qty yang <b>sudah dikirim Preparation</b> tapi belum selesai dikerjakan Presub. Kalau qty
                 selesai sudah sama dengan qty reject, permintaan otomatis ditutup dan dianggap selesai dikirim balik ke Sewing.
               </div>
+              {outstandingPresub.length > 0 && (
+                <div className="gp-line-bar">
+                  <div className="gp-field">
+                    <label>Filter Line</label>
+                    <select
+                      className="gp-input"
+                      style={{ width: 140 }}
+                      value={effPresubLine}
+                      onChange={(e) => setPresubLine(e.target.value)}
+                    >
+                      <option value="">Semua Line</option>
+                      {presubLineOptions.map((l) => (
+                        <option key={l} value={l}>
+                          {l}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="gp-field">
+                    <label>Urutan</label>
+                    <button className="gp-btn-small" onClick={() => cycleLineSort("presub")}>
+                      {SORT_LABEL[lineSort.presub]}
+                    </button>
+                  </div>
+                  <span className="gp-line-count">
+                    Menampilkan {visiblePresub.length} dari {outstandingPresub.length} tiket
+                  </span>
+                </div>
+              )}
               <div className="gp-table-scroll">
                 <table className="gp-table">
                   <thead>
@@ -670,7 +767,7 @@ export default function GantiPola() {
                     </tr>
                   </thead>
                   <tbody>
-                    {outstandingPresub.map((t) => {
+                    {visiblePresub.map((t) => {
                       const sisa = t.qtyPrep - t.qtyPresub;
                       return (
                         <tr key={t.id}>
@@ -718,6 +815,9 @@ export default function GantiPola() {
               </div>
               {outstandingPresub.length === 0 && (
                 <div className="gp-empty-note">Tidak ada beban outstanding di Presub saat ini.</div>
+              )}
+              {outstandingPresub.length > 0 && visiblePresub.length === 0 && (
+                <div className="gp-empty-note">Tidak ada tiket outstanding untuk Line {effPresubLine}.</div>
               )}
             </div>
           </div>
@@ -1024,6 +1124,19 @@ export default function GantiPola() {
           border: 1px solid currentColor;
           border-radius: 2px;
           padding: 2px 8px;
+        }
+        .gp-line-bar {
+          display: flex;
+          gap: 16px;
+          flex-wrap: wrap;
+          align-items: flex-end;
+          margin-bottom: 12px;
+        }
+        .gp-line-count {
+          font-family: var(--font-mono);
+          font-size: 11px;
+          color: var(--text-faint);
+          padding-bottom: 9px;
         }
         .gp-area-switch {
           display: flex;
