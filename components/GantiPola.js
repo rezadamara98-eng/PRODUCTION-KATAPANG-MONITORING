@@ -9,6 +9,7 @@ const SIZE_OPTIONS = ["XS", "S", "M", "L", "XL", "XXL"];
 const KETERANGAN_OPTIONS = ["Bolong", "Benang Putus", "Jahitan Miring/Dobel", "Warna Belang", "Ukuran Tidak Sesuai", "Noda/Kotor"];
 const JENIS_OPTIONS = ["Part", "Pola Full"];
 const REFRESH_MS = 25000;
+const LATE_MS = 48 * 60 * 60 * 1000; // batas terlambat: 48 jam
 const AREAS = [
   { key: "sewing", num: "1", short: "Sewing", title: "Production Sewing", desc: "Ajukan permintaan ganti pola untuk part yang reject." },
   { key: "prep", num: "2", short: "Preparation", title: "Preparation", desc: "Proses cutting ganti pola dan kirim ke Presub." },
@@ -103,8 +104,14 @@ function DurasiTag({ start, end }) {
       </span>
     );
   }
+  // Lewat 48 jam masih belum selesai = terlambat, tampil merah supaya langsung
+  // kelihatan di tabel Outstanding (Preparation, Presub) dan di Rekap.
+  const late = endTime - start > LATE_MS;
   return (
-    <span className="gp-tag warning" title={`masih berjalan sejak ${fmtDateTime(start)}`}>
+    <span
+      className={late ? "gp-tag critical" : "gp-tag warning"}
+      title={`masih berjalan sejak ${fmtDateTime(start)}${late ? " - lebih dari 48 jam" : ""}`}
+    >
       {label} (berjalan)
     </span>
   );
@@ -600,7 +607,7 @@ export default function GantiPola() {
             <div className="gp-panel-body">
               <div className="gp-panel-note">
                 Daftar di bawah adalah permintaan yang <b>masih ada sisa qty</b> untuk dikerjakan Preparation. Qty yang dicatat
-                selesai otomatis diteruskan sebagai beban Presub. Boleh dicicil (tidak harus sekaligus).
+                selesai otomatis diteruskan sebagai beban Presub. Boleh dicicil (tidak harus sekaligus). Usia berwarna <b style={{ color: "var(--red)" }}>merah</b> berarti sudah lebih dari 48 jam.
               </div>
               {outstandingPrep.length > 0 && (
                 <div className="gp-line-bar">
@@ -737,7 +744,7 @@ export default function GantiPola() {
             <div className="gp-panel-body">
               <div className="gp-panel-note">
                 Daftar di bawah adalah qty yang <b>sudah dikirim Preparation</b> tapi belum selesai dikerjakan Presub. Kalau qty
-                selesai sudah sama dengan qty reject, permintaan otomatis ditutup dan dianggap selesai dikirim balik ke Sewing.
+                selesai sudah sama dengan qty reject, permintaan otomatis ditutup dan dianggap selesai dikirim balik ke Sewing. Usia berwarna <b style={{ color: "var(--red)" }}>merah</b> berarti sudah lebih dari 48 jam.
               </div>
               {outstandingPresub.length > 0 && (
                 <div className="gp-line-bar">
