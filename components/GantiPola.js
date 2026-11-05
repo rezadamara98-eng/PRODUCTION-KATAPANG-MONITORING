@@ -25,6 +25,17 @@ function toDate(v) {
 function fmtDate(d) {
   return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 }
+// Dua baris (tanggal di atas, jam di bawah) supaya kolom Tgl Masuk tidak lebar.
+function TglMasukCell({ d }) {
+  if (!d) return <td>-</td>;
+  const jam = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  return (
+    <td style={{ whiteSpace: "nowrap" }}>
+      <div>{fmtDate(d)}</div>
+      <div style={{ fontSize: 10.5, color: "var(--text-faint)" }}>{jam}</div>
+    </td>
+  );
+}
 function fmtDateTime(d) {
   if (!d) return "-";
   const jam = String(d.getHours()).padStart(2, "0");
@@ -55,23 +66,41 @@ function normalizeSpo(s) {
     .replace(/[^0-9/]/g, "")
     .trim();
 }
-// Filter per Line + urutan Line untuk tabel Preparation/Presub. Sort stabil, jadi
-// di dalam satu Line urutan aslinya (tiket terbaru di atas) tetap terjaga.
-const SORT_NEXT = { none: "asc", asc: "desc", desc: "none" };
-const SORT_LABEL = { none: "Terbaru", asc: "Line A-Z (K01 ke K60)", desc: "Line Z-A (K60 ke K01)" };
+// Filter per Line/Jenis + pilihan urutan (tanggal masuk atau Line) untuk tabel
+// Preparation/Presub. Sort stabil, dan urutan Line dipecah dulu berdasar tanggal
+// masuk (terbaru di atas) supaya rapi di dalam satu Line.
+const SORT_OPTIONS = [
+  { value: "tgl_desc", label: "Tanggal masuk: terbaru" },
+  { value: "tgl_asc", label: "Tanggal masuk: terlama" },
+  { value: "line_asc", label: "Line A-Z (K01 ke K60)" },
+  { value: "line_desc", label: "Line Z-A (K60 ke K01)" },
+];
 function uniqueLines(list) {
   return Array.from(new Set(list.map((t) => t.line).filter(Boolean))).sort((a, b) =>
     a.localeCompare(b, undefined, { numeric: true })
   );
 }
-function applyLineView(list, lineFilter, jenisFilter, sortDir) {
+// Tiket tanpa tanggal (data lama yang rusak) selalu ditaruh paling bawah.
+function dateMs(d) {
+  return d ? d.getTime() : null;
+}
+function cmpDate(a, b, dir) {
+  if (a == null && b == null) return 0;
+  if (a == null) return 1;
+  if (b == null) return -1;
+  return (a - b) * dir;
+}
+function applyView(list, lineFilter, jenisFilter, sortKey, dateOf) {
   let out = lineFilter ? list.filter((t) => t.line === lineFilter) : list;
   if (jenisFilter) out = out.filter((t) => t.jenis === jenisFilter);
-  if (sortDir !== "none") {
-    const dir = sortDir === "asc" ? 1 : -1;
-    out = [...out].sort((a, b) => a.line.localeCompare(b.line, undefined, { numeric: true }) * dir);
-  }
-  return out;
+  return [...out].sort((a, b) => {
+    const da = dateMs(dateOf(a));
+    const db = dateMs(dateOf(b));
+    if (sortKey === "tgl_asc") return cmpDate(da, db, 1);
+    if (sortKey === "tgl_desc") return cmpDate(da, db, -1);
+    const lineCmp = a.line.localeCompare(b.line, undefined, { numeric: true }) * (sortKey === "line_asc" ? 1 : -1);
+    return lineCmp !== 0 ? lineCmp : cmpDate(da, db, -1);
+  });
 }
 function statusOf(t) {
   if (t.qtyPresub >= t.qtyReject) return "SELESAI";
@@ -160,8 +189,7 @@ export default function GantiPola() {
   const [presubLine, setPresubLine] = useState("");
   const [prepJenis, setPrepJenis] = useState(""); // "" = semua jenis
   const [presubJenis, setPresubJenis] = useState("");
-  const [lineSort, setLineSort] = useState({ prep: "none", presub: "none" });
-  const cycleLineSort = (key) => setLineSort((s) => ({ ...s, [key]: SORT_NEXT[s[key]] }));
+  const [sortBy, setSortBy] = useState({ prep: "tgl_desc", presub: "tgl_desc" });
   const [area, setArea] = useState(null); // null = layar pilih area; "sewing" | "prep" | "presub"
 
   // Peta SPO -> Style (read-only, dari tab "data base SPO & STYLE") - dimuat
@@ -327,12 +355,12 @@ export default function GantiPola() {
   const effPrepLine = prepLineOptions.includes(prepLine) ? prepLine : "";
   const effPresubLine = presubLineOptions.includes(presubLine) ? presubLine : "";
   const visiblePrep = useMemo(
-    () => applyLineView(outstandingPrep, effPrepLine, prepJenis, lineSort.prep),
-    [outstandingPrep, effPrepLine, prepJenis, lineSort.prep]
+    () => applyView(outstandingPrep, effPrepLine, prepJenis, sortBy.prep, (t) => t.tglRequest),
+    [outstandingPrep, effPrepLine, prepJenis, sortBy.prep]
   );
   const visiblePresub = useMemo(
-    () => applyLineView(outstandingPresub, effPresubLine, presubJenis, lineSort.presub),
-    [outstandingPresub, effPresubLine, presubJenis, lineSort.presub]
+    () => applyView(outstandingPresub, effPresubLine, presubJenis, sortBy.presub, (t) => t.tglMulaiPresub),
+    [outstandingPresub, effPresubLine, presubJenis, sortBy.presub]
   );
 
   const kpiData = useMemo(() => {
@@ -607,7 +635,7 @@ export default function GantiPola() {
             <div className="gp-panel-body">
               <div className="gp-panel-note">
                 Daftar di bawah adalah permintaan yang <b>masih ada sisa qty</b> untuk dikerjakan Preparation. Qty yang dicatat
-                selesai otomatis diteruskan sebagai beban Presub. Boleh dicicil (tidak harus sekaligus). Usia berwarna <b style={{ color: "var(--red)" }}>merah</b> berarti sudah lebih dari 48 jam.
+                selesai otomatis diteruskan sebagai beban Presub. Boleh dicicil (tidak harus sekaligus). <b>Tgl Masuk</b> = kapan permintaan diajukan oleh Sewing. Usia berwarna <b style={{ color: "var(--red)" }}>merah</b> berarti sudah lebih dari 48 jam.
               </div>
               {outstandingPrep.length > 0 && (
                 <div className="gp-line-bar">
@@ -644,10 +672,19 @@ export default function GantiPola() {
                     </select>
                   </div>
                   <div className="gp-field">
-                    <label>Urutan</label>
-                    <button className="gp-btn-small" onClick={() => cycleLineSort("prep")}>
-                      {SORT_LABEL[lineSort.prep]}
-                    </button>
+                    <label>Urutkan</label>
+                    <select
+                      className="gp-input"
+                      style={{ width: 210 }}
+                      value={sortBy.prep}
+                      onChange={(e) => setSortBy((st) => ({ ...st, prep: e.target.value }))}
+                    >
+                      {SORT_OPTIONS.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <span className="gp-line-count">
                     Menampilkan {visiblePrep.length} dari {outstandingPrep.length} tiket
@@ -659,6 +696,7 @@ export default function GantiPola() {
                   <thead>
                     <tr>
                       <th>ID</th>
+                      <th>Tgl Masuk</th>
                       <th>Line</th>
                       <th>SPO</th>
                       <th>Size</th>
@@ -679,6 +717,7 @@ export default function GantiPola() {
                       return (
                         <tr key={t.id}>
                           <td>{t.id}</td>
+                          <TglMasukCell d={t.tglRequest} />
                           <td>
                             <span className="gp-tag info">{t.line}</span>
                           </td>
@@ -744,7 +783,7 @@ export default function GantiPola() {
             <div className="gp-panel-body">
               <div className="gp-panel-note">
                 Daftar di bawah adalah qty yang <b>sudah dikirim Preparation</b> tapi belum selesai dikerjakan Presub. Kalau qty
-                selesai sudah sama dengan qty reject, permintaan otomatis ditutup dan dianggap selesai dikirim balik ke Sewing. Usia berwarna <b style={{ color: "var(--red)" }}>merah</b> berarti sudah lebih dari 48 jam.
+                selesai sudah sama dengan qty reject, permintaan otomatis ditutup dan dianggap selesai dikirim balik ke Sewing. <b>Tgl Masuk</b> = kapan qty pertama diterima dari Preparation. Usia berwarna <b style={{ color: "var(--red)" }}>merah</b> berarti sudah lebih dari 48 jam.
               </div>
               {outstandingPresub.length > 0 && (
                 <div className="gp-line-bar">
@@ -781,10 +820,19 @@ export default function GantiPola() {
                     </select>
                   </div>
                   <div className="gp-field">
-                    <label>Urutan</label>
-                    <button className="gp-btn-small" onClick={() => cycleLineSort("presub")}>
-                      {SORT_LABEL[lineSort.presub]}
-                    </button>
+                    <label>Urutkan</label>
+                    <select
+                      className="gp-input"
+                      style={{ width: 210 }}
+                      value={sortBy.presub}
+                      onChange={(e) => setSortBy((st) => ({ ...st, presub: e.target.value }))}
+                    >
+                      {SORT_OPTIONS.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <span className="gp-line-count">
                     Menampilkan {visiblePresub.length} dari {outstandingPresub.length} tiket
@@ -796,6 +844,7 @@ export default function GantiPola() {
                   <thead>
                     <tr>
                       <th>ID</th>
+                      <th>Tgl Masuk</th>
                       <th>Line</th>
                       <th>SPO</th>
                       <th>Size</th>
@@ -816,6 +865,7 @@ export default function GantiPola() {
                       return (
                         <tr key={t.id}>
                           <td>{t.id}</td>
+                          <TglMasukCell d={t.tglMulaiPresub} />
                           <td>
                             <span className="gp-tag info">{t.line}</span>
                           </td>
