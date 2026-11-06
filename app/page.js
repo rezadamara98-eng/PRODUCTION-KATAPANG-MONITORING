@@ -7,6 +7,7 @@ import GloveTracking from "@/components/GloveTracking";
 import CapacityPlanner from "@/components/CapacityPlanner";
 import LineBalancing from "@/components/LineBalancing";
 import GantiPola from "@/components/GantiPola";
+import MemoMaterial from "@/components/MemoMaterial";
 import AsikSolution from "@/components/AsikSolution";
 import Logo from "@/components/Logo";
 
@@ -17,6 +18,7 @@ const TABS = [
   { key: "capacity", label: "Perencanaan Kapasitas" },
   { key: "linebalancing", label: "Line Balancing" },
   { key: "gantipola", label: "Ganti Pola" },
+  { key: "memo", label: "Memo Material" },
   { key: "asik", label: "ASIK Solution" },
 ];
 
@@ -109,6 +111,7 @@ export default function Home() {
       {active === "capacity" && <CapacityPlanner />}
       {active === "linebalancing" && <LineBalancing />}
       {active === "gantipola" && <GantiPola />}
+      {active === "memo" && <MemoMaterial />}
       {active === "asik" && <AsikSolution />}
 
       <div
