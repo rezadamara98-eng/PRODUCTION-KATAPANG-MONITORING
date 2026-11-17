@@ -8,6 +8,7 @@ import CapacityPlanner from "@/components/CapacityPlanner";
 import LineBalancing from "@/components/LineBalancing";
 import GantiPola from "@/components/GantiPola";
 import MemoMaterial from "@/components/MemoMaterial";
+import WipAccessories from "@/components/WipAccessories";
 import AsikSolution from "@/components/AsikSolution";
 import Logo from "@/components/Logo";
 
@@ -19,6 +20,7 @@ const TABS = [
   { key: "linebalancing", label: "Line Balancing" },
   { key: "gantipola", label: "Ganti Pola" },
   { key: "memo", label: "Memo Material" },
+  { key: "wipacc", label: "WIP Accessories" },
   { key: "asik", label: "ASIK Solution" },
 ];
 
@@ -112,6 +114,7 @@ export default function Home() {
       {active === "linebalancing" && <LineBalancing />}
       {active === "gantipola" && <GantiPola />}
       {active === "memo" && <MemoMaterial />}
+      {active === "wipacc" && <WipAccessories />}
       {active === "asik" && <AsikSolution />}
 
       <div
