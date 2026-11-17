@@ -102,6 +102,35 @@ function applyView(list, lineFilter, jenisFilter, sortKey, dateOf) {
     return lineCmp !== 0 ? lineCmp : cmpDate(da, db, -1);
   });
 }
+// Rekap & Outstanding: filter Line + cari SPO + pilihan urutan (tanggal, Line,
+// atau SPO). Urutan Line/SPO dipecah dulu berdasar tanggal request (terbaru di
+// atas) supaya rapi di dalam satu Line/SPO. Pencarian SPO memakai normalisasi
+// yang sama dengan lookup Style, jadi "2011/26" atau "SPO-2011/26" sama-sama ketemu.
+const REKAP_SORT_OPTIONS = [
+  ...SORT_OPTIONS,
+  { value: "spo_asc", label: "SPO A-Z (kecil ke besar)" },
+  { value: "spo_desc", label: "SPO Z-A (besar ke kecil)" },
+];
+function applyRekapView(list, lineFilter, spoQuery, sortKey) {
+  let out = lineFilter ? list.filter((t) => t.line === lineFilter) : list;
+  const q = String(spoQuery || "").trim();
+  if (q) {
+    const nq = normalizeSpo(q);
+    const raw = q.toLowerCase();
+    out = out.filter((t) => (nq ? normalizeSpo(t.spo).includes(nq) : String(t.spo || "").toLowerCase().includes(raw)));
+  }
+  return [...out].sort((a, b) => {
+    const da = dateMs(a.tglRequest);
+    const db = dateMs(b.tglRequest);
+    if (sortKey === "tgl_asc") return cmpDate(da, db, 1);
+    if (sortKey === "tgl_desc") return cmpDate(da, db, -1);
+    const dir = sortKey.endsWith("_desc") ? -1 : 1;
+    const primary = sortKey.startsWith("spo")
+      ? String(a.spo || "").localeCompare(String(b.spo || ""), undefined, { numeric: true }) * dir
+      : String(a.line || "").localeCompare(String(b.line || ""), undefined, { numeric: true }) * dir;
+    return primary !== 0 ? primary : cmpDate(da, db, -1);
+  });
+}
 function statusOf(t) {
   if (t.qtyPresub >= t.qtyReject) return "SELESAI";
   if (t.qtyPrep === 0) return "BARU";
@@ -190,6 +219,9 @@ export default function GantiPola() {
   const [prepJenis, setPrepJenis] = useState(""); // "" = semua jenis
   const [presubJenis, setPresubJenis] = useState("");
   const [sortBy, setSortBy] = useState({ prep: "tgl_desc", presub: "tgl_desc" });
+  const [rekapLine, setRekapLine] = useState("");
+  const [rekapSpo, setRekapSpo] = useState("");
+  const [rekapSort, setRekapSort] = useState("tgl_desc");
   const [area, setArea] = useState(null); // null = layar pilih area; "sewing" | "prep" | "presub"
 
   // Peta SPO -> Style (read-only, dari tab "data base SPO & STYLE") - dimuat
@@ -390,11 +422,19 @@ export default function GantiPola() {
     ];
   }, [tickets, outstandingPrep, outstandingPresub]);
 
-  const rekapRows = useMemo(() => {
+  const rekapByStatus = useMemo(() => {
     if (filter === "outstanding") return tickets.filter((t) => t.qtyPresub < t.qtyReject);
     if (filter === "selesai") return tickets.filter((t) => t.qtyPresub >= t.qtyReject);
     return tickets;
   }, [tickets, filter]);
+  // Pilihan Line mengikuti tab status yang aktif; kalau Line terpilih tidak ada
+  // lagi di tab itu, otomatis kembali ke "Semua Line".
+  const rekapLineOptions = useMemo(() => uniqueLines(rekapByStatus), [rekapByStatus]);
+  const effRekapLine = rekapLineOptions.includes(rekapLine) ? rekapLine : "";
+  const rekapRows = useMemo(
+    () => applyRekapView(rekapByStatus, effRekapLine, rekapSpo, rekapSort),
+    [rekapByStatus, effRekapLine, rekapSpo, rekapSort]
+  );
 
   return (
     <div className="gp-root">
@@ -954,6 +994,53 @@ export default function GantiPola() {
                 <button className={`gp-filter-btn ${filter === "selesai" ? "active" : ""}`} onClick={() => setFilter("selesai")}>
                   Selesai
                 </button>
+              </div>
+              <div className="gp-line-bar">
+                <div className="gp-field">
+                  <label>Filter Line</label>
+                  <select
+                    className="gp-input"
+                    style={{ width: 160 }}
+                    value={effRekapLine}
+                    onChange={(e) => setRekapLine(e.target.value)}
+                  >
+                    <option value="">Semua Line</option>
+                    {rekapLineOptions.map((l) => (
+                      <option key={l} value={l}>
+                        {l}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="gp-field">
+                  <label>Cari SPO</label>
+                  <input
+                    className="gp-input"
+                    style={{ width: 170 }}
+                    type="text"
+                    placeholder="mis. 2011/26"
+                    value={rekapSpo}
+                    onChange={(e) => setRekapSpo(e.target.value)}
+                  />
+                </div>
+                <div className="gp-field">
+                  <label>Urutkan</label>
+                  <select
+                    className="gp-input"
+                    style={{ width: 230 }}
+                    value={rekapSort}
+                    onChange={(e) => setRekapSort(e.target.value)}
+                  >
+                    {REKAP_SORT_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <span className="gp-line-count">
+                  Menampilkan {rekapRows.length} dari {rekapByStatus.length} tiket
+                </span>
               </div>
               <div className="gp-table-scroll">
                 <table className="gp-table">
