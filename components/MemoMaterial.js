@@ -194,8 +194,19 @@ export default function MemoMaterial() {
 
   useEffect(() => {
     fetchMemos();
-    const id = setInterval(() => fetchMemos({ silent: true }), REFRESH_MS);
-    return () => clearInterval(id);
+    // Tab browser yang tidak sedang dilihat tidak ikut menarik data (menghemat
+    // kuota baca Google Sheets); begitu tab dibuka lagi, data langsung disegarkan.
+    const id = setInterval(() => {
+      if (document.visibilityState === "visible") fetchMemos({ silent: true });
+    }, REFRESH_MS);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") fetchMemos({ silent: true });
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [fetchMemos]);
 
   function addDraftRow() {
